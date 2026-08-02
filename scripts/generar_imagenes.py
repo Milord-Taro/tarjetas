@@ -39,39 +39,39 @@ ANCHO_UTIL = WIDTH - 2 * MARGEN_X
 # una cuña ancha a la izquierda.
 CORTE_PROF = int(WIDTH * 0.30)   # profundidad total (punta izquierda del olivo)
 CORTE_VERTICE_X = int(WIDTH * 0.20)
-CABECERA_BASE = 560              # y donde termina la cuña olivo (borde izquierdo)
+CABECERA_BASE = 548              # y donde termina la cuña olivo (borde izquierdo)
 
-LOGO_TOP = 60
+LOGO_TOP = 46
 LOGO_MAX_W = 400
 LOGO_MAX_H = 162
 TAGLINE_GAP = 30
 
-NOMBRE_TOP = 600
+NOMBRE_TOP = 560
 NOMBRE_INTERLINEA = 74
 GAP_NOMBRE_CARGO = 20
 GAP_CARGO_REGLA = 18
-GAP_REGLA_SECCION = 34
+GAP_REGLA_SECCION = 22
 
 GAP_TITULO_REGLA = 32
 GAP_REGLA_FILA = 26
 ALTO_ETIQUETA = 28
 ALTO_VALOR = 42
-GAP_ENTRE_FILAS = 22
+GAP_ENTRE_FILAS = 20
 ALTO_LINEA_DIRECCION = 38
-GAP_ENTRE_SECCIONES = 26
-GAP_SECCION_REDES = 20
-GAP_REDES_QR = 22
+GAP_ENTRE_SECCIONES = 16
+GAP_SECCION_REDES = 12
+GAP_REDES_QR = 10
 
 BADGE_RADIO = 30
 GAP_BADGE_TEXTO = 26
 BADGE_RED_RADIO = 34
 
-QR_TAMANO = 200
+QR_TAMANO = 360
 QR_MARCO_PAD = 18
 QR_MARCO_RADIO = 24
 QR_GAP = 48
 
-PIE_ALTO = 92
+PIE_ALTO = 80
 
 # Directorios donde buscar Montserrat: primero el proyecto, luego el sistema.
 DIR_FUENTES_PROYECTO = ROOT / "assets" / "fuentes"
@@ -425,17 +425,26 @@ def dibujar_seccion(draw, y, paleta, titulo, filas):
 QR_BOX = 10
 
 
+# Corrección de errores. Q recupera el 25% del código, de sobra para el emblema
+# del centro, que tapa cerca del 10% del área. Se bajó desde H (30%) porque H
+# obligaba a 53 módulos: al ver la imagen completa en un monitor, cada módulo
+# quedaba en 2px y la cámara del teléfono no alcanzaba a resolverlos. Menos
+# corrección = menos módulos = módulos más grandes, que es lo que se necesita
+# para escanear desde una pantalla.
+QR_CORRECCION = qrcode.constants.ERROR_CORRECT_Q
+
+
 def version_qr(datos):
     """Versión (tamaño en módulos) que le toca a este contenido por sí solo."""
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=QR_BOX, border=2)
+    qr = qrcode.QRCode(error_correction=QR_CORRECCION, box_size=QR_BOX, border=2)
     qr.add_data(datos)
     qr.make(fit=True)
     return qr.version
 
 
 def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None, version=None):
-    """QR con corrección alta para poder incrustar el emblema al centro sin
-    perder legibilidad (así lo muestra el arte aprobado).
+    """QR con corrección de errores suficiente para incrustar el emblema al
+    centro sin perder legibilidad (así lo muestra el arte aprobado).
 
     Si se pide un tamaño objetivo, se escala a un múltiplo exacto del número de
     módulos y con vecino más cercano. Interpolando, los bordes de módulo quedan
@@ -443,7 +452,7 @@ def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None, versi
     era el caso del QR del vCard, que por ser una URL más larga tiene más módulos.
     """
     qr = qrcode.QRCode(
-        version=version, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=QR_BOX, border=2
+        version=version, error_correction=QR_CORRECCION, box_size=QR_BOX, border=2
     )
     qr.add_data(datos)
     qr.make(fit=True)

@@ -88,6 +88,16 @@ Los QR se escalan a un múltiplo exacto del número de módulos, con vecino más
 cercano. Si se interpolan, los bordes quedan difusos y dejan de leerse apenas la
 imagen se ve pequeña.
 
+Lo que decide si un QR se escanea desde una pantalla no es la resolución del
+archivo sino cuántos píxeles mide cada módulo cuando la imagen se ve completa:
+al abrir una imagen de 1080×2000 en un monitor de 1080p se muestra a la mitad,
+así que un módulo de 4px queda en 2 y la cámara no lo resuelve. Por eso los dos
+QR usan corrección Q en vez de H (menos corrección → menos módulos → módulos más
+grandes) y ocupan `QR_TAMANO = 360`: quedan en 4px por módulo en pantalla, el
+doble que antes. Si se agranda el QR o se alarga la URL hay que revisar que la
+cuenta siga dando — el script avisa si el bloque invade el pie, pero no si los
+módulos quedaron muy finos.
+
 Para previsualizar: `python3 -m http.server 8899 --directory dist` y abrir
 `http://localhost:8899/daniel-manotas/`.
 
