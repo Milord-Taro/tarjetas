@@ -17,8 +17,8 @@ assets/
   fuentes/           # Montserrat variable, para que los PNG usen la tipografía corporativa
 templates/
   v1/                # legacy, no se mantiene
-  v2/                # tema activo: paleta del roll-up (carbón + olivo + crema)
-  v3/                # mismo arte que la v2 con la paleta oficial del manual
+  v2/                # arte del roll-up (carbón + olivo + crema)
+  v3/                # tema activo: el mismo arte con la paleta oficial del manual
 scripts/
   validar.mjs           # esquema de data/ + validador (lo corre build.mjs y CI)
   build.mjs             # genera dist/ a partir de data/
@@ -251,8 +251,9 @@ que el texto pequeño cumpla AA sobre crema y sobre carbón.
 
 Por eso conviven las dos paletas: la **v2** está construida casi entera sobre el
 roll-up (28 usos contra 6 del manual) y la **v3** solo sobre el manual. El
-manual no tiene olivo, así que llevar la tarjeta a la paleta nueva no es cambiar
-unos valores sino repintar el arte — que es justo lo que es la v3.
+manual no tiene olivo, así que llevar la tarjeta a la paleta nueva no fue
+cambiar unos valores sino repintar el arte — que es lo que es la v3, hoy el tema
+activo. La v2 queda en `dist/{slug}/v2/` para poder compararlas.
 
 ### El arte, por roles
 
@@ -374,8 +375,8 @@ se sirve desde el propio sitio.
 **Lo más rápido — abrir el archivo directamente.** No hace falta ni servidor:
 
 ```bash
-xdg-open dist/daniel-manotas/index.html       # tema activo (v2)
-xdg-open dist/daniel-manotas/v3/index.html    # v3
+xdg-open dist/daniel-manotas/index.html       # tema activo (v3)
+xdg-open dist/daniel-manotas/v2/index.html    # v2, para comparar
 xdg-open dist/daniel-manotas/tarjeta-whatsapp.png
 ```
 
@@ -389,13 +390,13 @@ python3 -m http.server 8899 --directory dist
 | | |
 |---|---|
 | Raíz | <http://localhost:8899/> |
-| Tema activo (v2) | <http://localhost:8899/daniel-manotas/> |
-| v3 | <http://localhost:8899/daniel-manotas/v3/> |
+| Tema activo (v3) | <http://localhost:8899/daniel-manotas/> |
+| v2 | <http://localhost:8899/daniel-manotas/v2/> |
 | Imagen de WhatsApp | <http://localhost:8899/daniel-manotas/tarjeta-whatsapp.png> |
 
 **Desde el móvil**, en la misma red wifi: arranca el servidor con
 `python3 -m http.server 8899 --bind 0.0.0.0 --directory dist`, mira tu IP con
-`hostname -I` y entra a `http://ESA-IP:8899/daniel-manotas/v3/`. Es la única
+`hostname -I` y entra a `http://ESA-IP:8899/daniel-manotas/`. Es la única
 forma de juzgar de verdad la tarjeta, porque se reparte por WhatsApp y se abre
 en un teléfono.
 

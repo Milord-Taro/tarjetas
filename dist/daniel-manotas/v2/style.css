@@ -1,12 +1,7 @@
-/* Tarjeta digital — tema v3 "manual".
-   Mismo arte que la v2 —cabecera cortada en chevron sobre una cuña, cuerpo
-   claro, badges circulares y pie— pero pintado con la paleta oficial del manual
-   de marca en vez de con la del roll-up. No cambia ni la información, ni la
-   retícula, ni la geometría del corte: solo el color.
-
-   Por eso este archivo usa únicamente los cinco roles del manual
-   (oscuro/claro/fondo/apoyo/acento) y ninguna variable del roll-up: cada marca
-   rellena esos cinco y el tema funciona sin tocar el CSS. */
+/* Tarjeta digital — tema v2 "secundarios".
+   Arte tomado del roll-up aprobado: cabecera carbón cortada en chevron sobre una
+   cuña olivo, cuerpo en crema, badges circulares olivo y pie olivo.
+   La información es la misma de la v1 (nada se quita, se suman WhatsApp y LinkedIn). */
 
 /* La tipografía de la marca, servida desde el propio sitio: cargarla de
    fonts.googleapis.com le entregaba la IP y el User-Agent de quien escanea el
@@ -31,8 +26,12 @@
   --color-claro: #8E8B86;   /* Gris Piedra */
   --color-fondo: #F5F2EB;   /* Marfil */
 
-  --color-apoyo: #C8C1B8;   /* Taupe */
-  --color-acento: #2C2C2C;  /* Grafito */
+  /* Paleta secundaria: no está en el manual de marca, sale del arte del roll-up. */
+  --color-carbon: #24292D;
+  --color-olivo: #83855B;
+  --color-olivo-texto: #6B6C47; /* olivo oscurecido: el olivo base no da contraste AA en texto pequeño */
+  --color-olivo-claro: #A8AA7C; /* olivo aclarado: para texto sobre el carbón */
+  --color-crema: #F4F1EC;
 
   --fuente-marca: 'Montserrat', sans-serif;
   --logo-marca: none;
@@ -40,9 +39,9 @@
   /* Geometría del corte de la cabecera, medida sobre el roll-up y normalizada al
      ancho de la tarjeta. Todo se deriva de --corte-prof (la profundidad total,
      que es donde llega la punta izquierda del olivo):
-       · cuña   → diagonal simple, sube de izquierda a derecha
-       · bloque → chevron, con el vértice al 20% del ancho
-     La franja queda delgada a la derecha y como cuña ancha a la izquierda,
+       · olivo  → diagonal simple, sube de izquierda a derecha
+       · carbón → chevron, con el vértice al 20% del ancho
+     La franja olivo queda delgada a la derecha y como cuña ancha a la izquierda,
      que es justo lo que da el aire del arte original. */
   --corte-prof: clamp(50px, 9.5vh, 112px);
   --corte-vertice-x: 20%;
@@ -87,10 +86,10 @@ body {
   min-height: 100vh;
   /* Fondo de página: el crema apenas oscurecido, para que la tarjeta se despegue. */
   background: #E7E2DA;
-  background: color-mix(in srgb, var(--color-fondo) 84%, var(--color-oscuro) 16%);
+  background: color-mix(in srgb, var(--color-crema) 84%, var(--color-carbon) 16%);
   font-family: var(--fuente-marca);
   font-weight: 400;
-  color: var(--color-oscuro);
+  color: var(--color-carbon);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -133,7 +132,7 @@ body::before {
   max-width: var(--ancho-tarjeta);
   display: flex;
   flex-direction: column;
-  background: var(--color-fondo);
+  background: var(--color-crema);
   overflow: hidden; /* recorta las capas de la cabecera contra los bordes */
 }
 
@@ -163,7 +162,7 @@ body::before {
 .cabecera {
   position: relative;
   /* Capa de abajo: el olivo, con corte diagonal simple. */
-  background: var(--color-apoyo);
+  background: var(--color-olivo);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -179,7 +178,7 @@ body::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--color-oscuro);
+  background: var(--color-carbon);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -219,11 +218,11 @@ body::before {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: var(--color-fondo);
+  color: var(--color-crema);
 }
 
 .cabecera__tagline .sep {
-  color: var(--color-claro);
+  color: var(--color-olivo-claro);
   padding: 0 0.35em;
 }
 
@@ -247,8 +246,8 @@ body::before {
   left: var(--marca-corner-margen);
   width: var(--marca-corner-tamano);
   height: var(--marca-corner-tamano);
-  border-top: 1px solid var(--color-apoyo);
-  border-left: 1px solid var(--color-apoyo);
+  border-top: 1px solid var(--color-olivo);
+  border-left: 1px solid var(--color-olivo);
   pointer-events: none;
   z-index: 2;
 }
@@ -309,7 +308,7 @@ body::before {
   height: 0.62em;
   margin-left: 0.3em;
   vertical-align: 0.02em;
-  color: var(--color-acento);
+  color: var(--color-olivo);
   transition: transform 0.15s ease;
 }
 
@@ -318,15 +317,15 @@ body::before {
 }
 
 .identidad__descarga:hover .identidad__apellidos {
-  color: var(--color-acento);
+  color: var(--color-olivo-texto);
 }
 
 .identidad__pila {
-  color: var(--color-oscuro);
+  color: var(--color-carbon);
 }
 
 .identidad__apellidos {
-  color: var(--color-claro);
+  color: var(--color-olivo);
   transition: color 0.15s ease;
 }
 
@@ -334,13 +333,13 @@ body::before {
   margin: var(--e-nombre-cargo) 0 0;
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--color-acento);
+  color: var(--color-oscuro);
 }
 
 /* Barra entre cargo y profesión. En olivo claro y con aire a los lados para que
    separe sin leerse como un carácter más del texto. */
 .identidad__sep {
-  color: var(--color-claro);
+  color: var(--color-olivo-claro);
   font-weight: 400;
   padding: 0 0.5em;
 }
@@ -369,7 +368,7 @@ body::before {
   width: 50px;
   height: 2px;
   margin: clamp(0.45rem, 1vh, 0.8rem) auto 0;
-  background: var(--color-acento);
+  background: var(--color-olivo);
 }
 
 /* ── Bloques de contacto (Personal arriba, Empresa abajo) ────────────────── */
@@ -386,7 +385,7 @@ body::before {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: var(--color-acento);
+  color: var(--color-olivo-texto);
 }
 
 /* Regla fina que completa el ancho a la derecha del título. */
@@ -394,7 +393,7 @@ body::before {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--color-acento);
+  background: var(--color-olivo);
   opacity: 0.45;
 }
 
@@ -423,8 +422,8 @@ body::before {
   width: var(--badge-tamano);
   height: var(--badge-tamano);
   border-radius: 50%;
-  background: var(--color-apoyo);
-  color: var(--color-oscuro);
+  background: var(--color-olivo);
+  color: var(--color-fondo);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -443,7 +442,7 @@ body::before {
   flex-direction: column;
   gap: 0.15rem;
   padding: var(--e-entre-datos) 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-acento) 35%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-olivo) 35%, transparent);
 }
 
 .contacto:last-child .contacto__texto {
@@ -453,14 +452,14 @@ body::before {
 .contacto__etiqueta {
   font-size: 0.73rem;
   font-weight: 600;
-  color: var(--color-acento);
+  color: var(--color-olivo-texto);
 }
 
 .contacto__valor {
   font-size: clamp(0.78rem, 3.35vw, 0.95rem);
   font-weight: 400;
   line-height: 1.38;
-  color: var(--color-oscuro);
+  color: var(--color-carbon);
   text-decoration: none;
   word-break: break-word;
   border-bottom: 1px solid transparent;
@@ -468,7 +467,7 @@ body::before {
 }
 
 .contacto__valor:hover {
-  border-bottom-color: var(--color-acento);
+  border-bottom-color: var(--color-olivo);
 }
 
 /* ── Redes ───────────────────────────────────────────────────────────────── */
@@ -494,8 +493,8 @@ body::before {
   width: var(--badge-red-tamano);
   height: var(--badge-red-tamano);
   border-radius: 50%;
-  border: 1px solid var(--color-acento);
-  color: var(--color-acento);
+  border: 1px solid var(--color-olivo);
+  color: var(--color-olivo-texto);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -511,13 +510,13 @@ body::before {
   font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--color-acento);
+  color: var(--color-oscuro);
   text-align: center;
   white-space: nowrap;
 }
 
 .red:hover .red__badge {
-  background: var(--color-oscuro);
+  background: var(--color-olivo);
   color: var(--color-fondo);
 }
 
@@ -526,7 +525,7 @@ body::before {
    Ahora el pie ES el botón: la franja olivo entera es el área clicable, así que
    se compacta el alto — sin el texto de firma no necesita tanto aire. */
 .pie {
-  background: var(--color-oscuro);
+  background: var(--color-olivo);
   transition: background-color 0.15s ease;
 }
 
@@ -552,12 +551,12 @@ body::before {
 }
 
 .pie:hover {
-  background: var(--color-acento);
+  background: var(--color-olivo-texto);
 }
 
 /* Accesibilidad */
 a:focus-visible {
-  outline: 2px solid var(--color-oscuro);
+  outline: 2px solid var(--color-carbon);
   outline-offset: 3px;
 }
 

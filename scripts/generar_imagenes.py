@@ -58,34 +58,49 @@ WIDTH, HEIGHT = 1080, 2000
 MARGEN_X = 96
 ANCHO_UTIL = WIDTH - 2 * MARGEN_X
 
-# Cabecera: mismas proporciones que el CSS del tema v2. El olivo lleva un corte
-# diagonal simple y el carbón que va encima lleva un corte en chevron con el
-# vértice al 20% del ancho — por eso la franja olivo es delgada a la derecha y
-# una cuña ancha a la izquierda.
-CORTE_PROF = int(WIDTH * 0.30)   # profundidad total (punta izquierda del olivo)
+# Cabecera: la cuña lleva un corte diagonal simple y el bloque que va encima
+# lleva un corte en chevron con el vértice al 20% del ancho — por eso la franja
+# de la cuña es delgada a la derecha y ancha a la izquierda.
+#
+# La profundidad es 0.267 del ancho, la misma proporción que el CSS de la web
+# (--corte-prof: 112px sobre una tarjeta de ~420). Antes era 0.30, y con ese
+# corte más profundo la diagonal subía tanto hacia la derecha que quedaba
+# tocando el pie de "CONSTRUCCIÓN": 0 px de holgura. Con 0.267 y la base 20 px
+# más abajo, el tagline respira ~50 px, como en la web.
+CORTE_PROF = int(WIDTH * 0.267)  # profundidad total (punta izquierda de la cuña)
 CORTE_VERTICE_X = int(WIDTH * 0.20)
-CABECERA_BASE = 548              # y donde termina la cuña olivo (borde izquierdo)
+CABECERA_BASE = 568              # y donde termina la cuña (borde izquierdo)
 
 LOGO_TOP = 46
 LOGO_MAX_W = 400
 LOGO_MAX_H = 162
 TAGLINE_GAP = 30
 
-NOMBRE_TOP = 560
-NOMBRE_INTERLINEA = 74
-GAP_NOMBRE_CARGO = 20
-GAP_CARGO_REGLA = 18
-GAP_REGLA_SECCION = 56
+# El lienzo sigue midiendo 1080x2000: los 20 px que bajó la cabecera salen del
+# cuerpo. En vez de recortárselos a un solo bloque —que descuadraría el ritmo—
+# se ajustan todos los aires por el mismo factor, así la tarjeta se cierra de
+# forma pareja y mantiene las proporciones entre sus zonas. AIRE es el único
+# número que hay que tocar si la cabecera vuelve a cambiar de alto.
+AIRE = 0.94
+_aire = lambda px: int(round(px * AIRE))
 
-GAP_TITULO_REGLA = 32
-GAP_REGLA_FILA = 26
+NOMBRE_TOP = CABECERA_BASE + 12
+NOMBRE_INTERLINEA = 74
+GAP_NOMBRE_CARGO = _aire(20)
+GAP_CARGO_REGLA = _aire(18)
+GAP_REGLA_SECCION = _aire(56)
+
+GAP_TITULO_REGLA = _aire(32)
+GAP_REGLA_FILA = _aire(26)
+# Estos tres son métricas de línea, atadas al cuerpo de la letra: no se escalan
+# con el aire porque apretarlos no es dar menos espacio, es partir el texto.
 ALTO_ETIQUETA = 28
 ALTO_VALOR = 42
-GAP_ENTRE_FILAS = 34
 ALTO_LINEA_DIRECCION = 38
-GAP_ENTRE_SECCIONES = 40
-GAP_SECCION_REDES = 46
-GAP_REDES_QR = 26
+GAP_ENTRE_FILAS = _aire(34)
+GAP_ENTRE_SECCIONES = _aire(40)
+GAP_SECCION_REDES = _aire(46)
+GAP_REDES_QR = _aire(26)
 
 BADGE_RADIO = 30
 GAP_BADGE_TEXTO = 26
