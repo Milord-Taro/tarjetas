@@ -4,7 +4,7 @@
 
    La imagen sigue el mismo arte del tema v2: cuña olivo con corte diagonal y,
    encima, bloque carbón cortado en chevron; cuerpo en crema con la jerarquía
-   Personal / Empresa y pie olivo."""
+   de contacto en un solo bloque y pie olivo."""
 
 import json
 import math
@@ -50,17 +50,17 @@ NOMBRE_TOP = 560
 NOMBRE_INTERLINEA = 74
 GAP_NOMBRE_CARGO = 20
 GAP_CARGO_REGLA = 18
-GAP_REGLA_SECCION = 22
+GAP_REGLA_SECCION = 56
 
 GAP_TITULO_REGLA = 32
 GAP_REGLA_FILA = 26
 ALTO_ETIQUETA = 28
 ALTO_VALOR = 42
-GAP_ENTRE_FILAS = 20
+GAP_ENTRE_FILAS = 34
 ALTO_LINEA_DIRECCION = 38
-GAP_ENTRE_SECCIONES = 16
-GAP_SECCION_REDES = 12
-GAP_REDES_QR = 10
+GAP_ENTRE_SECCIONES = 40
+GAP_SECCION_REDES = 46
+GAP_REDES_QR = 26
 
 BADGE_RADIO = 30
 GAP_BADGE_TEXTO = 26
@@ -534,22 +534,25 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     y = dibujar_identidad(draw, NOMBRE_TOP, paleta, persona)
     y += GAP_REGLA_SECCION
 
-    y = dibujar_seccion(
-        draw, y, paleta, "Personal",
-        [
-            ("whatsapp", "WhatsApp", persona.get("telefono_display")),
-            ("correo", "Correo", persona.get("email")),
-        ],
-    )
-    y += GAP_ENTRE_SECCIONES
-
     direccion = marca.get("direccion")
     direccion_lineas = direccion if isinstance(direccion, list) else ([direccion] if direccion else [])
+
+    # Un solo bloque, igual que la tarjeta web: son todos canales de trabajo. Los
+    # dos correos se distinguen por la etiqueta y no por un título de sección, y
+    # el calificador solo aparece si de verdad hay dos que separar.
+    dos_correos = bool(persona.get("email")) and bool(marca.get("email"))
+    dos_whatsapp = bool(persona.get("telefono_display")) and bool(marca.get("telefono_display"))
     y = dibujar_seccion(
         draw, y, paleta, "Empresa",
         [
-            ("whatsapp", "WhatsApp", marca.get("telefono_display")),
-            ("correo", "Correo", marca.get("email")),
+            # dibujar_seccion descarta las filas sin valor: lo que la persona no
+            # publica, simplemente no aparece.
+            ("whatsapp", "WhatsApp empresarial" if dos_whatsapp else "WhatsApp",
+             marca.get("telefono_display")),
+            ("whatsapp", "WhatsApp profesional" if dos_whatsapp else "WhatsApp",
+             persona.get("telefono_display")),
+            ("correo", "Correo profesional" if dos_correos else "Correo", persona.get("email")),
+            ("correo", "Correo empresarial" if dos_correos else "Correo", marca.get("email")),
             ("ubicacion", "Oficina", direccion_lineas),
         ],
     )

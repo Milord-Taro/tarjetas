@@ -3,6 +3,21 @@
    cuña olivo, cuerpo en crema, badges circulares olivo y pie olivo.
    La información es la misma de la v1 (nada se quita, se suman WhatsApp y LinkedIn). */
 
+/* Montserrat servida desde el propio sitio: cargarla de fonts.googleapis.com
+   le entregaba la IP y el User-Agent de quien escanea el QR a un tercero, y
+   dejaba la tarjeta dependiendo de la red para verse bien. El archivo es una
+   fuente variable, así que un solo .ttf cubre de 100 a 900. Se guarda una sola
+   vez, en el assets/ de la persona, y por eso la ruta pasa por base_recursos:
+   el tema activo la ve en ./assets/ y los secundarios en ../assets/. Si una marca define otra tipografía en marcas.json,
+   esa cae a la sans-serif del sistema mientras no se agregue su archivo. */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('./assets/Montserrat-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Valores por defecto (TOPP CREATE); card.html los sobreescribe por marca. */
   --color-oscuro: #4D4D4D;
@@ -26,29 +41,31 @@
        · carbón → chevron, con el vértice al 20% del ancho
      La franja olivo queda delgada a la derecha y como cuña ancha a la izquierda,
      que es justo lo que da el aire del arte original. */
-  --corte-prof: clamp(58px, 9.5vh, 112px);
+  --corte-prof: clamp(50px, 9.5vh, 112px);
   --corte-vertice-x: 20%;
 
   /* Escala de espaciado — mismo valor en cada transición equivalente.
-     Cada paso va en clamp() contra vh: el máximo es el diseño aireado original
-     (pantallas altas y escritorio), el mínimo es lo más apretado que aguanta sin
-     que los bloques se toquen. Así la tarjeta entra completa sin scroll en un
-     móvil corto, en vez de fijar un alto que solo sirve para un tamaño. */
-  --e-pad-tarjeta: 1.75rem;                      /* 28px — margen lateral del cuerpo */
-  --e-cabecera-top: clamp(0.7rem, 1.8vh, 1.5rem);
-  --e-logo-tagline: clamp(0.45rem, 1vh, 0.8rem);
-  --e-cabecera-nombre: clamp(0.65rem, 1.6vh, 1.25rem);
-  --e-nombre-cargo: clamp(0.3rem, 0.7vh, 0.6rem);
-  --e-cargo-bloque: clamp(0.6rem, 1.5vh, 1.25rem);
-  --e-titulo-dato: clamp(0.4rem, 1.05vh, 0.9rem);
-  --e-entre-datos: clamp(0.28rem, 0.8vh, 0.7rem);
-  --e-entre-bloques: clamp(0.55rem, 1.4vh, 1.2rem);
-  --e-bloques-redes: clamp(0.55rem, 1.4vh, 1.2rem);
-  --e-redes-pie: clamp(0.6rem, 1.7vh, 1.5rem);   /* cierre del cuerpo antes del pie */
+     Cada paso va en clamp() contra vh, y el rango es deliberadamente ancho: el
+     máximo es el diseño aireado (pantallas altas y escritorio) y el mínimo es lo
+     más apretado que aguanta sin que los bloques se toquen. Así la tarjeta se
+     descompacta donde hay alto disponible y se cierra en un móvil corto para
+     entrar completa sin scroll, en vez de fijar un alto que solo sirve para un
+     tamaño. */
+  --e-pad-tarjeta: 1.85rem;                      /* margen lateral del cuerpo */
+  --e-cabecera-top: clamp(0.4rem, 2vh, 1.7rem);
+  --e-logo-tagline: clamp(0.28rem, 1.15vh, 0.95rem);
+  --e-cabecera-nombre: clamp(0.45rem, 1.9vh, 1.55rem);
+  --e-nombre-cargo: clamp(0.22rem, 0.8vh, 0.7rem);
+  --e-cargo-bloque: clamp(0.4rem, 1.8vh, 1.55rem);
+  --e-titulo-dato: clamp(0.28rem, 1.2vh, 1.05rem);
+  --e-entre-datos: clamp(0.2rem, 0.98vh, 0.88rem);
+  --e-entre-bloques: clamp(0.4rem, 1.7vh, 1.5rem);
+  --e-bloques-redes: clamp(0.4rem, 1.75vh, 1.55rem);
+  --e-redes-pie: clamp(0.42rem, 2vh, 1.8rem);    /* cierre del cuerpo antes del pie */
 
-  --ancho-tarjeta: 420px;
-  --badge-tamano: clamp(32px, 4.6vh, 38px);
-  --badge-red-tamano: clamp(34px, 4.9vh, 40px);
+  --ancho-tarjeta: 440px;
+  --badge-tamano: clamp(32px, 5vh, 42px);
+  --badge-red-tamano: clamp(32px, 5.2vh, 44px);
   --marca-corner-tamano: 26px;
   --marca-corner-margen: 14px;
 }
@@ -73,7 +90,7 @@ body {
   color: var(--color-carbon);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -104,6 +121,11 @@ body::before {
 .tarjeta {
   position: relative;
   z-index: 1;
+  /* Centrado vertical con márgenes automáticos y no con align-items: cuando la
+     tarjeta es más alta que la ventana, align-items:center le corta la parte de
+     arriba (queda fuera del área desplazable); los márgenes auto simplemente se
+     colapsan a cero y la tarjeta se ve completa desde el principio. */
+  margin: auto 0;
   width: 100%;
   max-width: var(--ancho-tarjeta);
   display: flex;
@@ -113,9 +135,14 @@ body::before {
 }
 
 @media (min-width: 480px) {
+  /* El aire mínimo alrededor de la tarjeta va como padding de la página y no como
+     margen de la tarjeta, para no pisar los márgenes auto que la centran. Cede
+     antes que el contenido cuando la ventana es baja. */
+  body {
+    padding: min(2rem, 1.2vh) 0;
+  }
+
   .tarjeta {
-    /* El margen cede antes que el contenido cuando la ventana es baja. */
-    margin: min(2rem, 1.2vh) 0;
     box-shadow: 0 18px 50px rgba(36, 41, 45, 0.16);
   }
 }
@@ -124,8 +151,8 @@ body::before {
    una porción desproporcionada de la cabecera. */
 @media (max-width: 380px) {
   :root {
-    --corte-prof: clamp(62px, 10vh, 92px);
-    --e-pad-tarjeta: 1.4rem;
+    --corte-prof: clamp(50px, 10vh, 92px);
+    --e-pad-tarjeta: 1.2rem;
   }
 }
 
@@ -168,7 +195,7 @@ body::before {
 .cabecera .logo {
   display: block;
   margin: 0 auto;
-  width: clamp(86px, 13vh, 130px);
+  width: clamp(78px, 14vh, 142px);
   max-width: 50%;
   height: auto;
 }
@@ -185,7 +212,7 @@ body::before {
 /* Tagline: palabras en claro y separadores en olivo, como el original. */
 .cabecera__tagline {
   margin: var(--e-logo-tagline) 0 0;
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -257,7 +284,7 @@ body::before {
   /* Una sola línea: el cuerpo se adapta al ancho para que "Daniel J. Manotas C."
      entre completo también en pantallas de 320px. El máximo bajó de 6.1vw al
      sumarse la flecha de descarga al final de la línea. */
-  font-size: clamp(1.2rem, 5.6vw, 1.7rem);
+  font-size: clamp(1.25rem, 5.6vw, 1.85rem);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.015em;
@@ -302,7 +329,7 @@ body::before {
 
 .identidad__cargo {
   margin: var(--e-nombre-cargo) 0 0;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: var(--color-oscuro);
 }
@@ -336,9 +363,9 @@ body::before {
 
 .identidad__regla {
   display: block;
-  width: 46px;
+  width: 50px;
   height: 2px;
-  margin: clamp(0.4rem, 0.9vh, 0.7rem) auto 0;
+  margin: clamp(0.45rem, 1vh, 0.8rem) auto 0;
   background: var(--color-olivo);
 }
 
@@ -352,7 +379,7 @@ body::before {
   align-items: center;
   gap: 0.75rem;
   margin: 0 0 var(--e-titulo-dato);
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.18em;
@@ -421,15 +448,15 @@ body::before {
 }
 
 .contacto__etiqueta {
-  font-size: 0.7rem;
+  font-size: 0.73rem;
   font-weight: 600;
   color: var(--color-olivo-texto);
 }
 
 .contacto__valor {
-  font-size: 0.88rem;
+  font-size: clamp(0.78rem, 3.35vw, 0.95rem);
   font-weight: 400;
-  line-height: 1.35;
+  line-height: 1.38;
   color: var(--color-carbon);
   text-decoration: none;
   word-break: break-word;
@@ -478,7 +505,7 @@ body::before {
 }
 
 .red__etiqueta {
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--color-oscuro);
@@ -505,10 +532,10 @@ body::before {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: clamp(0.6rem, 1.45vh, 0.95rem) 1rem;
+  padding: clamp(0.5rem, 1.7vh, 1.15rem) 1rem;
   color: var(--color-fondo);
   font-family: var(--fuente-marca);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -516,8 +543,8 @@ body::before {
 }
 
 .pie__icono {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   flex: none;
 }
 

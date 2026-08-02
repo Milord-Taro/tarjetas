@@ -5,9 +5,8 @@ FN:Daniel J. Manotas C.
 ORG:TOPP CREATE
 TITLE:Co-Fundador
 ROLE:Arquitecto
-TEL;TYPE=CELL:+573022629945
 TEL;TYPE=WORK:+573022629945
-EMAIL:arq.danielmanotas@toppcreate.com
+EMAIL;TYPE=WORK,PREF:arq.danielmanotas@toppcreate.com
 EMAIL;TYPE=WORK:info@toppcreate.com
 URL:https://toppcreate.com/
 X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/daniel-j-manotas-a83a105b/

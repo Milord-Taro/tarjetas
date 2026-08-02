@@ -35,6 +35,72 @@ dist/                # salida generada, no se edita a mano (se publica en GitHub
 - `dist/` es la salida generada (no se edita a mano), lo que eventualmente se
   publica en GitHub Pages.
 
+## Qué se publica y qué no
+
+`dist/` se sirve en GitHub Pages: todo lo que entre en `data/personas.json` queda
+público en texto plano, indexable y raspable, y además queda en el historial de
+git aunque después se borre. Por eso la tarjeta solo lleva canales
+**profesionales**:
+
+- el correo corporativo de la persona (`arq.nombre@toppcreate.com`);
+- los canales de la empresa (WhatsApp, correo, oficina).
+
+Todo va en un solo bloque **Empresa**: son canales de trabajo y el cliente los
+vive como una sola cosa. Los dos correos se distinguen por la etiqueta —"Correo
+profesional" el de la persona, "Correo empresarial" el de la marca— y el
+calificador solo aparece cuando de verdad hay dos filas del mismo tipo que
+separar; con un solo correo, la etiqueta es "Correo" a secas.
+
+El móvil y el correo personales **no van** ni en la tarjeta ni en el `.vcf`. Si
+un cliente necesita un contacto más directo, se le entrega aparte y de forma
+consentida, después del primer contacto por los canales de la empresa.
+
+Las filas de contacto se arman en `build.mjs` a partir de los campos que
+existan: un campo ausente en el JSON no genera fila, y una sección sin filas
+desaparece con su título. Así, quitar un dato del JSON basta para quitarlo de la
+tarjeta, del vCard y de la imagen.
+
+Antes de sumar a otra persona hay que pedirle consentimiento explícito por cada
+dato que se publique: son datos personales de un tercero y aplica la Ley 1581 de
+2012.
+
+### Cómo trata el build los datos de entrada
+
+Hoy los JSON los escribe quien mantiene el repo, pero la idea es que cada
+profesional aporte su ficha (por PR o por un formulario). Desde ese momento
+`data/` es entrada no confiable, así que `build.mjs` valida antes de emitir:
+
+| Campo | Qué se acepta | Por qué |
+|---|---|---|
+| `sitio_web`, `linkedin` | solo `https:`, `http:`, `mailto:`, `tel:` | escapar no impide un `javascript:` en un `href` |
+| `colores.*`, `tipografia` | `#rgb`…`#rrggbbaa`, y nombres alfanuméricos | van dentro de `<style>`, donde el navegador no decodifica entidades: un `;` o un `}` dejarían inyectar reglas nuevas, incluido un `url()` externo |
+| `logo`, `logo_claro`, `fondo_plano` | un nombre plano, sin `/` ni `..` | se concatenan con `path.join` y se copian a `dist/`, que es lo que se publica |
+| `whatsapp`, `email`, `instagram` | dígitos / correo / usuario | se concatenan dentro de URLs que arma el build |
+
+Lo que no pasa la validación se descarta con un aviso en consola y se cae al
+valor por defecto; el build no falla. Hay una prueba manual rápida: meter valores
+hostiles en `marcas.json`, correr `node scripts/build.mjs` y comprobar que
+avisa por cada uno y que nada de eso aparece en `dist/`.
+
+### Terceros y publicación
+
+- **Sin llamadas de red.** Montserrat se sirve desde el propio sitio
+  (`@font-face` en cada `style.css`, archivo copiado por el build): pedirla a
+  `fonts.googleapis.com` le entregaba la IP y el User-Agent de quien escanea el
+  QR a un tercero. La tarjeta también se ve bien sin conexión.
+- **Sin scripts en línea.** El logo se emite como `<img>` o como texto de
+  respaldo según lo que el build encuentre en disco, sin el `onerror` que antes
+  hacía el cambio en el navegador. La tarjeta ya no ejecuta JavaScript, así que
+  admite `script-src 'none'`. (Las variables de marca siguen en un `<style>` en
+  línea, de modo que `style-src` necesitaría `'unsafe-inline'` o un hash; y
+  GitHub Pages no permite mandar cabeceras, así que una CSP tendría que ir en un
+  `<meta http-equiv>`.)
+- **`noindex`** en las plantillas y `dist/robots.txt` con `Disallow: /`. No es
+  una medida de seguridad —quien tenga el enlace entra igual— pero evita
+  buscadores y raspadores que respetan el archivo.
+- Las acciones del workflow van **ancladas al SHA** del commit, no al tag: un
+  tag se puede mover.
+
 ## Temas
 
 Cada subcarpeta de `templates/` es un tema (`card.html` + `style.css`). El tema

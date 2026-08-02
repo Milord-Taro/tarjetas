@@ -1,5 +1,20 @@
 /* Estilos base de la tarjeta digital — paleta monocromática, tipografía Montserrat. */
 
+/* Montserrat servida desde el propio sitio: cargarla de fonts.googleapis.com
+   le entregaba la IP y el User-Agent de quien escanea el QR a un tercero, y
+   dejaba la tarjeta dependiendo de la red para verse bien. El archivo es una
+   fuente variable, así que un solo .ttf cubre de 100 a 900. Se guarda una sola
+   vez, en el assets/ de la persona, y por eso la ruta pasa por base_recursos:
+   el tema activo la ve en ./assets/ y los secundarios en ../assets/. Si una marca define otra tipografía en marcas.json,
+   esa cae a la sans-serif del sistema mientras no se agregue su archivo. */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('{{base_recursos}}assets/Montserrat-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Valores por defecto (TOPP CREATE); card.html los sobreescribe por marca. */
   --color-oscuro: #4D4D4D;

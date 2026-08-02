@@ -2,6 +2,10 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Ajustes locales de Claude Code: son de la máquina de cada quien (rutas,
+# permisos concedidos), no del proyecto.
+.claude/settings.local.json
+
 # Material de origen bajado de Figma: es un proyecto aparte con su propio
 # control de versiones, no forma parte de la generación de las tarjetas.
 Diseño tarjeta presentación digital(1)/
