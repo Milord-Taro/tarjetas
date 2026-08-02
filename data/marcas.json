@@ -21,6 +21,13 @@
       "olivo_claro": "#A8AA7C",
       "crema": "#F4F1EC"
     },
+    "uso_paleta": {
+      "fondo": 70,
+      "oscuro": 20,
+      "claro": 8,
+      "apoyo": 8,
+      "acento": 2
+    },
     "tipografia": {
       "familia": "Montserrat",
       "archivo": "Montserrat-Variable.ttf",

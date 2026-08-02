@@ -98,6 +98,10 @@ const CAMPOS_MARCA = {
   // hecho (hay valor por defecto para todos); apoyo y acento son opcionales y
   // los usan las plantillas que los pidan.
   colores: { tipo: 'colores', claves: ['oscuro', 'claro', 'fondo', 'apoyo', 'acento'] },
+  // Qué proporción de la pieza debería ocupar cada rol, según el manual. No lo
+  // usa el build: lo lee scripts/comparar_temas.py para contrastar el objetivo
+  // con el reparto que de verdad tiene la tarjeta.
+  uso_paleta: { tipo: 'uso_paleta' },
   colores_secundarios: {
     tipo: 'colores',
     claves: ['carbon', 'olivo', 'olivo_texto', 'olivo_claro', 'crema'],
@@ -236,6 +240,20 @@ const COMPROBACIONES = {
       return 'debe ser una URL absoluta (con https://)';
     }
     return url.protocol === 'https:' ? null : 'debe ser https';
+  },
+  uso_paleta: (valor, campo, ruta, errores) => {
+    if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) {
+      return 'debe ser un objeto de rol → porcentaje';
+    }
+    const roles = ['oscuro', 'claro', 'fondo', 'apoyo', 'acento'];
+    for (const [rol, pct] of Object.entries(valor)) {
+      if (!roles.includes(rol)) {
+        errores.push({ ruta: `${ruta}.${rol}`, mensaje: 'rol de color desconocido', dura: false });
+      } else if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+        errores.push({ ruta: `${ruta}.${rol}`, mensaje: 'debe ser un porcentaje entre 0 y 100', dura: false });
+      }
+    }
+    return null;
   },
   booleano: (valor) => (typeof valor === 'boolean' ? null : 'debe ser true o false'),
   dominios: (valor) => {

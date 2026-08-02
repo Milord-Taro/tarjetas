@@ -366,8 +366,53 @@ doble que antes. Si se agranda el QR o se alarga la URL hay que revisar que la
 cuenta siga dando — el script avisa si el bloque invade el pie, pero no si los
 módulos quedaron muy finos.
 
-Para previsualizar: `python3 -m http.server 8899 --directory dist` y abrir
-`http://localhost:8899/daniel-manotas/`.
+## Cómo ver las tarjetas
+
+Todo funciona **sin internet**: `dist/` es HTML, CSS e imágenes, y la tipografía
+se sirve desde el propio sitio.
+
+**Lo más rápido — abrir el archivo directamente.** No hace falta ni servidor:
+
+```bash
+xdg-open dist/daniel-manotas/index.html       # tema activo (v2)
+xdg-open dist/daniel-manotas/v3/index.html    # v3
+xdg-open dist/daniel-manotas/tarjeta-whatsapp.png
+```
+
+**Con servidor local**, que es lo que más se parece a lo publicado (las rutas
+absolutas y la descarga del `.vcf` se comportan igual):
+
+```bash
+python3 -m http.server 8899 --directory dist
+```
+
+| | |
+|---|---|
+| Raíz | <http://localhost:8899/> |
+| Tema activo (v2) | <http://localhost:8899/daniel-manotas/> |
+| v3 | <http://localhost:8899/daniel-manotas/v3/> |
+| Imagen de WhatsApp | <http://localhost:8899/daniel-manotas/tarjeta-whatsapp.png> |
+
+**Desde el móvil**, en la misma red wifi: arranca el servidor con
+`python3 -m http.server 8899 --bind 0.0.0.0 --directory dist`, mira tu IP con
+`hostname -I` y entra a `http://ESA-IP:8899/daniel-manotas/v3/`. Es la única
+forma de juzgar de verdad la tarjeta, porque se reparte por WhatsApp y se abre
+en un teléfono.
+
+**Los dos temas lado a lado, con el reparto de color medido:**
+
+```bash
+python3 scripts/comparar_temas.py            # v2 contra v3
+python3 scripts/comparar_temas.py v2 v3 --abrir
+```
+
+Compila cada tema en un temporal —no toca `dist/` ni `data/`— y deja
+`build/comparativa.png` con las dos piezas y una barra que mide qué porcentaje
+ocupa cada color, contra el objetivo que declara la marca en `uso_paleta`.
+
+**En internet** está solo el tema activo, en
+<https://milord-taro.github.io/tarjetas/>. Los temas secundarios también se
+publican, en `/{slug}/{tema}/`, pero solo después de hacer push.
 
 ## Publicación
 
