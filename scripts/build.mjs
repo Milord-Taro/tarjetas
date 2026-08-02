@@ -71,6 +71,64 @@ const FUENTES_COMPARTIDAS = path.join(ASSETS_DIR, 'fuentes');
 
 const FORMATOS_FUENTE = { ttf: 'truetype', otf: 'opentype', woff2: 'woff2', woff: 'woff' };
 
+// ── Paleta de arte, por tema ────────────────────────────────────────────────
+// La imagen para WhatsApp dibuja la misma pieza que la tarjeta web, así que
+// necesita saber qué color va en cada parte del arte. Se expresa por ROL —lo
+// que la cosa es— y no por color: "bloque" es la cabecera y el pie, "cuña" es
+// la franja de debajo, "línea" son las reglas finas. Cada tema dice qué color
+// de la marca ocupa cada rol, y así un tema nuevo no obliga a tocar el script
+// de Python.
+//
+// v1 no aparece porque su arte es otro y la imagen nunca lo dibujó; si llegara
+// a ser el tema activo, se usa el mapa de la v2.
+const ARTE_POR_TEMA = {
+  // v2: arte del roll-up aprobado — carbón, olivo y crema.
+  v2: {
+    lienzo: 'crema',
+    bloque: 'carbon',
+    cuna: 'olivo',
+    superficie: 'olivo',
+    sobre_bloque: 'crema',
+    sobre_superficie: 'crema',
+    texto: 'carbon',
+    texto_suave: 'olivo_texto',
+    texto_secundario: 'oscuro',
+    realce: 'olivo',
+    linea: 'olivo',
+    linea_suave: 'olivo_claro',
+    pie: 'olivo',
+    sobre_pie: 'fondo',
+    marco_qr: 'carbon',
+    qr_modulo: 'carbon',
+    qr_fondo: 'fondo',
+  },
+  // v3: el mismo arte con la paleta oficial del manual. El manual no tiene un
+  // acento cromático, así que el realce (los apellidos) lo hace el gris piedra
+  // por diferencia de valor, y las líneas y el texto secundario van en grafito
+  // —el gris piedra no da contraste AA en texto pequeño sobre marfil—.
+  v3: {
+    lienzo: 'fondo',
+    bloque: 'oscuro',
+    cuna: 'apoyo',
+    superficie: 'apoyo',
+    sobre_bloque: 'fondo',
+    sobre_superficie: 'oscuro',
+    texto: 'oscuro',
+    texto_suave: 'acento',
+    texto_secundario: 'acento',
+    realce: 'claro',
+    linea: 'acento',
+    linea_suave: 'claro',
+    pie: 'oscuro',
+    sobre_pie: 'fondo',
+    // El marco va un punto más claro que los módulos: separa el código del
+    // marco y le devuelve al grafito su papel de resalte.
+    marco_qr: 'acento',
+    qr_modulo: 'oscuro',
+    qr_fondo: 'fondo',
+  },
+};
+
 const LOGOS_CANDIDATOS = [
   'logo-vertical-gris.png',
   'logo-horizontal-gris.png',
@@ -941,11 +999,12 @@ for (const personaCruda of personas) {
       sitio_web: marca.sitio_web,
       direccion: marca.direccion ?? null,
     },
-    // Sin alfa: el PNG compone sobre fondo opaco.
-    colores: Object.fromEntries(
-      Object.entries(paletaResuelta).map(([clave, color]) => [
-        clave,
-        sinAlfa(color, `${slug} → color ${clave}`),
+    // Paleta de arte del tema activo, por rol. Sin alfa: el PNG compone sobre
+    // fondo opaco.
+    arte: Object.fromEntries(
+      Object.entries(ARTE_POR_TEMA[temaActivo] ?? ARTE_POR_TEMA.v2).map(([rol, clave]) => [
+        rol,
+        sinAlfa(paletaResuelta[clave], `${slug} → color ${clave}`),
       ])
     ),
     // Rutas relativas a la raíz del repo, ya comprobadas contra la carpeta de la
@@ -1055,7 +1114,13 @@ if (retirados.length && !RETIRAR) {
 mkdirSync(BUILD_DIR, { recursive: true });
 writeFileSync(
   path.join(BUILD_DIR, 'manifiesto.json'),
-  JSON.stringify({ version: 1, dist: path.relative(ROOT, DIST_DIR), personas: manifiesto }, null, 2) + '\n'
+  // dist relativo al propio manifiesto y no a la raíz del repo: así una
+  // compilación con --out fuera del árbol sigue apuntando a su propia salida.
+  JSON.stringify(
+    { version: 1, dist: path.relative(BUILD_DIR, DIST_DIR), personas: manifiesto },
+    null,
+    2
+  ) + '\n'
 );
 
 console.log('\nResumen de generación:\n');

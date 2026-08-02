@@ -146,7 +146,7 @@ test('un color en forma corta compila y llega normalizado a seis dígitos', () =
   assert.ok(css.includes('#AABBCC'), 'el color corto debería expandirse');
 
   const manifiesto = leerManifiesto(raiz);
-  for (const color of Object.values(manifiesto.personas[0].colores)) {
+  for (const color of Object.values(manifiesto.personas[0].arte)) {
     assert.match(color, /^#[0-9A-F]{6}$/, `${color} debería venir en forma larga y sin alfa`);
   }
 });
@@ -211,6 +211,33 @@ test('la fuente declarada se copia y se referencia según el tema', () => {
 
   const secundario = readFileSync(path.join(dist, 'ana-perez', 'v1', 'style.css'), 'utf8');
   assert.match(secundario, /src: url\('\.\.\/assets\/Montserrat-Variable\.ttf'\)/);
+});
+
+test('la v3 usa solo los cinco roles del manual, sin la paleta del roll-up', () => {
+  const css = readFileSync(path.join(ROOT, 'templates', 'v3', 'style.css'), 'utf8');
+  const html = readFileSync(path.join(ROOT, 'templates', 'v3', 'card.html'), 'utf8');
+  for (const rollUp of ['--color-carbon', '--color-olivo', '--color-crema']) {
+    assert.ok(!css.includes(rollUp), `v3/style.css no debería nombrar ${rollUp}`);
+    assert.ok(!html.includes(rollUp), `v3/card.html no debería nombrar ${rollUp}`);
+  }
+  // Una marca nueva se pinta entera rellenando marcas.json → colores.
+  for (const rol of ['--color-oscuro', '--color-claro', '--color-fondo', '--color-apoyo', '--color-acento']) {
+    assert.ok(html.includes(rol), `falta ${rol} en v3/card.html`);
+  }
+});
+
+test('la paleta de arte del manifiesto sigue al tema activo', () => {
+  // El mismo rol toma un color distinto de la marca según el tema: con v2 el
+  // bloque es el carbón del roll-up, con v3 es el "oscuro" del manual.
+  const conV2 = leerManifiesto(compilar([ficha({})]).raiz).personas[0].arte;
+  assert.equal(conV2.bloque, '#24292D');
+  assert.equal(conV2.cuna, '#83855B', 'con v2 la cuña es olivo');
+
+  const conV3 = leerManifiesto(
+    compilar([ficha({})], { config: { ...CONFIG, tema: 'v3' } }).raiz
+  ).personas[0].arte;
+  assert.equal(conV3.bloque, '#4D4D4D', 'con v3 el bloque sale de colores.oscuro');
+  assert.equal(conV3.cuna, '#C8C1B8', 'con v3 la cuña es el apoyo del manual');
 });
 
 test('poda los archivos que sobran dentro de una tarjeta activa', () => {

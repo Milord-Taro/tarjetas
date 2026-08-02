@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daniel J. Manotas C. — Tarjeta digital</title>
+<meta name="description" content="Tarjeta de presentación digital de Daniel J. Manotas C., Co-Fundador | Arquitecto en TOPP CREATE.">
+<meta name="theme-color" content="#24292D">
+<!-- La tarjeta se reparte por QR y por WhatsApp, no se busca en Google; y no
+     tiene por qué quedar indexada ni raspada por estar en un sitio público. -->
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="./style.css">
+
+<style>
+  /* Variables de marca inyectadas en build. La v3 usa solo los cinco roles del
+     manual, así que una marca nueva se pinta entera rellenando marcas.json →
+     colores, sin tocar el CSS. */
+  :root {
+    --color-oscuro: #121212;
+    --color-claro: #8E8B86;
+    --color-fondo: #F5F2EB;
+    --color-apoyo: #C8C1B8;
+    --color-acento: #2C2C2C;
+    --fuente-marca: 'Montserrat', sans-serif;
+    --logo-marca: url('./assets/logo-vertical-gris.png');
+    --fondo-plano: url('./assets/fondo-plano-habs.png');
+  }
+</style>
+</head>
+<body>
+  <main class="tarjeta">
+
+    <!-- Cabecera: dos capas con cortes distintos, como el arte del roll-up. Abajo
+         el olivo con un corte diagonal simple; encima el carbón con un corte en
+         chevron cuyo vértice cae al 20% del ancho. De ahí que la franja olivo se
+         vea delgada a la derecha y como una cuña ancha a la izquierda. -->
+    <header class="cabecera">
+      <div class="cabecera__contenido">
+        <img class="logo" src="./assets/logo-vertical-blanco.png" alt="Logo de TOPP CREATE">
+        <p class="cabecera__tagline">Arquitectura<span class="sep" aria-hidden="true">•</span>Diseño<span class="sep" aria-hidden="true">•</span>Construcción</p>
+      </div>
+    </header>
+
+    <div class="cuerpo">
+
+      <section class="identidad">
+        <!-- El nombre es además el enlace de descarga de la tarjeta como imagen:
+             se marca con subrayado punteado y una flecha para que se note que es
+             clicable, en vez de repetir un botón aparte. -->
+        <h1 class="identidad__nombre">
+          <a class="identidad__descarga" href="../tarjeta-whatsapp.png" download="daniel-manotas-whatsapp.png"
+             title="Descargar la tarjeta como imagen, para compartir por WhatsApp"
+             aria-label="Daniel J. Manotas C. — descargar la tarjeta como imagen">
+            <span class="identidad__pila">Daniel J.</span> <span class="identidad__apellidos">Manotas C.</span><svg class="identidad__icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><polyline points="7,11 12,16 17,11"/><path d="M4 20h16"/></svg>
+          </a>
+        </h1>
+        <p class="identidad__cargo"><span class="identidad__cargo-parte">Co-Fundador</span><span class="identidad__sep" aria-hidden="true">|</span><span class="identidad__cargo-parte">Arquitecto</span></p>
+        <span class="identidad__regla" aria-hidden="true"></span>
+      </section>
+
+      <!-- Bloques de contacto: "Directo" (la persona) siempre encima de "Empresa".
+           Se arman en build.mjs porque cada campo es opcional — una fila sin dato
+           no debe existir, y una sección sin filas desaparece con su título. -->
+      <section class="bloque" aria-label="Contacto empresa">
+        <h2 class="bloque__titulo">Empresa</h2>
+        <ul class="contactos">
+          <li class="contacto">
+            <span class="contacto__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.9-.9L3 20.5l1.5-4.9A8.4 8.4 0 0 1 12.6 3a8.4 8.4 0 0 1 8.4 8.5z"/><path d="M8.9 8.2c.2-.5.4-.5.7-.5h.5c.2 0 .4 0 .6.5l.7 1.6c.1.3 0 .5-.1.6l-.4.5c-.2.2-.2.3-.1.5a6 6 0 0 0 2.8 2.4c.2.1.4.1.5-.1l.5-.6c.2-.2.3-.2.6-.1l1.6.8c.3.1.4.3.4.5s0 .8-.3 1.1c-.3.4-.9.7-1.4.7-1 0-2.9-.7-4.4-2.2s-2.3-3.3-2.3-4.4c0-.6.3-1.1.6-1.3z"/></svg></span>
+            <span class="contacto__texto">
+              <span class="contacto__etiqueta">WhatsApp</span>
+              <a class="contacto__valor" href="https://wa.me/573022629945" target="_blank" rel="noopener">+57 302 262 9945</a>
+            </span>
+          </li>
+          <li class="contacto">
+            <span class="contacto__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3,6 12,13 21,6"/></svg></span>
+            <span class="contacto__texto">
+              <span class="contacto__etiqueta">Correo profesional</span>
+              <a class="contacto__valor" href="mailto:arq.danielmanotas@toppcreate.com">arq.danielmanotas@toppcreate.com</a>
+            </span>
+          </li>
+          <li class="contacto">
+            <span class="contacto__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3,6 12,13 21,6"/></svg></span>
+            <span class="contacto__texto">
+              <span class="contacto__etiqueta">Correo empresarial</span>
+              <a class="contacto__valor" href="mailto:info@toppcreate.com">info@toppcreate.com</a>
+            </span>
+          </li>
+          <li class="contacto contacto--direccion">
+            <span class="contacto__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <span class="contacto__texto">
+              <span class="contacto__etiqueta">Oficina</span>
+              <a class="contacto__valor" href="https://www.google.com/maps/search/?api=1&amp;query=TOPP%20CREATE%2C%20Centro%20Comercial%20Las%20Ramblas%2C%20Local%20111%2C%20Cartagena%20de%20Indias%2C%20Bol%C3%ADvar" target="_blank" rel="noopener">Centro Comercial Las Ramblas, Local 111<br>Cartagena de Indias, Bolívar</a>
+            </span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Redes: los items son opcionales por persona, así que la fila se arma en build.mjs. -->
+      <section class="redes" aria-label="Enlaces y redes">
+        <a class="red" href="https://toppcreate.com/" target="_blank" rel="noopener" aria-label="Sitio web">
+          <span class="red__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><line x1="2.5" y1="12" x2="21.5" y2="12"/><path d="M12 2.5a15 15 0 0 1 4 9.5 15 15 0 0 1-4 9.5 15 15 0 0 1-4-9.5 15 15 0 0 1 4-9.5z"/></svg></span>
+          <span class="red__etiqueta">toppcreate.com</span>
+        </a>
+        <a class="red" href="https://instagram.com/toppcreate" target="_blank" rel="noopener" aria-label="Instagram">
+          <span class="red__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="5"/><circle cx="12" cy="12" r="4.2"/><line x1="17.6" y1="6.4" x2="17.6" y2="6.4"/></svg></span>
+          <span class="red__etiqueta">@toppcreate</span>
+        </a>
+        <a class="red" href="https://www.linkedin.com/in/daniel-j-manotas-a83a105b/" target="_blank" rel="noopener" aria-label="LinkedIn">
+          <span class="red__badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.05c.53-.95 1.83-1.95 3.75-1.95C21.6 8.75 23 11 23 14.25V21h-4v-6c0-1.6-.03-3.65-2.25-3.65-2.25 0-2.6 1.73-2.6 3.53V21h-4V9z"/></svg></span>
+          <span class="red__etiqueta">LinkedIn</span>
+        </a>
+      </section>
+
+    </div>
+
+    <!-- El pie llevaba el sitio web, que ya está arriba en la fila de redes. En su
+         lugar va la acción principal: guardar el contacto. -->
+    <footer class="pie">
+      <a class="pie__accion" href="../contacto.vcf" download="daniel-manotas.vcf">
+        <svg class="pie__icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-3A3.5 3.5 0 0 0 6 18.5V20"/><circle cx="11" cy="8" r="3.2"/><path d="M19 8v5"/><path d="M16.5 10.5h5"/></svg>
+        Guardar contacto
+      </a>
+    </footer>
+
+  </main>
+</body>
+</html>

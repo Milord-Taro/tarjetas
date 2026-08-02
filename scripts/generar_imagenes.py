@@ -10,9 +10,11 @@
    lo que nadie revisa a ojo—. Ahora la única entrada es el manifiesto, que ya
    viene validado y normalizado, y la URL la calcula el build.
 
-   La imagen sigue el mismo arte del tema v2: cuña olivo con corte diagonal y,
-   encima, bloque carbón cortado en chevron; cuerpo en crema con la jerarquía
-   de contacto en un solo bloque y pie olivo."""
+   El arte es el mismo del tema v2 —cuña con corte diagonal y, encima, bloque
+   cortado en chevron; cuerpo claro con la jerarquía de contacto en un solo
+   bloque y pie— pero los colores no están aquí: llegan en el manifiesto por
+   ROL (bloque, cuña, superficie, línea…) según el tema activo. Así la imagen
+   sigue al tema sin tocar este archivo."""
 
 import json
 import math
@@ -23,18 +25,33 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-MANIFIESTO = ROOT / "build" / "manifiesto.json"
 
-# Paleta por defecto (TOPP CREATE); marcas.json la sobreescribe por marca.
-COLORES = {
-    "oscuro": "#4D4D4D",
-    "claro": "#B3B3B3",
-    "fondo": "#FFFFFF",
-    "carbon": "#24292D",
-    "olivo": "#83855B",
-    "olivo_texto": "#6B6C47",
-    "olivo_claro": "#A8AA7C",
-    "crema": "#F4F1EC",
+# Por defecto, el manifiesto del repo. Se puede pasar otro como argumento para
+# renderizar una compilación hecha con `build.mjs --out` en otro sitio, que es
+# como se sacan las maquetas de un tema sin tocar lo publicado.
+MANIFIESTO = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "build" / "manifiesto.json"
+
+# Roles del arte, con los valores de la v2 como respaldo. Los de verdad los
+# resuelve build.mjs según el tema activo (ARTE_POR_TEMA) y llegan en el
+# manifiesto: aquí solo se dibuja.
+ARTE_RESPALDO = {
+    "lienzo": "#F4F1EC",
+    "bloque": "#24292D",
+    "cuna": "#83855B",
+    "superficie": "#83855B",
+    "sobre_bloque": "#F4F1EC",
+    "sobre_superficie": "#F4F1EC",
+    "texto": "#24292D",
+    "texto_suave": "#6B6C47",
+    "texto_secundario": "#4D4D4D",
+    "realce": "#83855B",
+    "linea": "#83855B",
+    "linea_suave": "#A8AA7C",
+    "pie": "#83855B",
+    "sobre_pie": "#FFFFFF",
+    "marco_qr": "#24292D",
+    "qr_modulo": "#24292D",
+    "qr_fondo": "#FFFFFF",
 }
 
 WIDTH, HEIGHT = 1080, 2000
@@ -182,9 +199,9 @@ def envolver_texto(draw, texto, fnt, ancho_max):
 
 
 def dibujar_cabecera(img, draw, paleta, logo_path, marca):
-    """Cabecera del arte del roll-up: cuña olivo con corte diagonal simple y,
-    encima, el bloque carbón con corte en chevron. Las proporciones son las
-    mismas del CSS (0.9 / 0.25 / 0.52 de la profundidad total)."""
+    """Cabecera: cuña con corte diagonal simple y, encima, el bloque con corte
+    en chevron. Las proporciones son las mismas del CSS (0.9 / 0.25 / 0.52 de la
+    profundidad total)."""
     draw.polygon(
         [
             (0, 0),
@@ -192,7 +209,7 @@ def dibujar_cabecera(img, draw, paleta, logo_path, marca):
             (WIDTH, CABECERA_BASE - CORTE_PROF * 0.9),
             (0, CABECERA_BASE),
         ],
-        fill=paleta["olivo"],
+        fill=paleta["cuna"],
     )
     draw.polygon(
         [
@@ -202,7 +219,7 @@ def dibujar_cabecera(img, draw, paleta, logo_path, marca):
             (CORTE_VERTICE_X, CABECERA_BASE - CORTE_PROF * 0.25),
             (0, CABECERA_BASE - CORTE_PROF * 0.52),
         ],
-        fill=paleta["carbon"],
+        fill=paleta["bloque"],
     )
 
     y_fin_logo = LOGO_TOP + LOGO_MAX_H
@@ -218,7 +235,7 @@ def dibujar_cabecera(img, draw, paleta, logo_path, marca):
         fnt = fuente("semibold", 46)
         texto = marca.get("nombre", "").upper()
         ancho = ancho_espaciado(draw, texto, fnt, 8)
-        texto_espaciado(draw, ((WIDTH - ancho) / 2, LOGO_TOP + 60), texto, fnt, paleta["fondo"], 8)
+        texto_espaciado(draw, ((WIDTH - ancho) / 2, LOGO_TOP + 60), texto, fnt, paleta["sobre_bloque"], 8)
         y_fin_logo = LOGO_TOP + 120
 
     tagline = marca.get("tagline")
@@ -231,8 +248,8 @@ def dibujar_cabecera(img, draw, paleta, logo_path, marca):
         tramos = []
         for indice, parte in enumerate(partes):
             if indice:
-                tramos.append((separador, paleta["olivo_claro"]))
-            tramos.append((parte.upper(), paleta["crema"]))
+                tramos.append((separador, paleta["linea_suave"]))
+            tramos.append((parte.upper(), paleta["sobre_bloque"]))
 
         ancho_total = sum(ancho_espaciado(draw, texto, fnt, 5) + 5 for texto, _ in tramos) - 5
         x = (WIDTH - ancho_total) / 2
@@ -271,9 +288,9 @@ def dibujar_identidad(draw, y, paleta, persona):
     ancho_pila = draw.textlength(pila, font=fnt)
     ancho_apellidos = draw.textlength(apellidos, font=fnt)
     x = (WIDTH - (ancho_pila + separacion + ancho_apellidos)) / 2
-    draw.text((x, y), pila, font=fnt, fill=paleta["carbon"])
+    draw.text((x, y), pila, font=fnt, fill=paleta["texto"])
     if apellidos:
-        draw.text((x + ancho_pila + separacion, y), apellidos, font=fnt, fill=paleta["olivo"])
+        draw.text((x + ancho_pila + separacion, y), apellidos, font=fnt, fill=paleta["realce"])
     y += NOMBRE_INTERLINEA - 4
 
     # Cargo y profesión en la misma línea, separados por una barra en olivo claro.
@@ -285,8 +302,8 @@ def dibujar_identidad(draw, y, paleta, persona):
         tramos = []
         for i, parte in enumerate(partes):
             if i:
-                tramos.append(("  |  ", paleta["olivo_claro"]))
-            tramos.append((parte, paleta["oscuro"]))
+                tramos.append(("  |  ", paleta["linea_suave"]))
+            tramos.append((parte, paleta["texto_secundario"]))
         ancho_total = sum(draw.textlength(t, font=fnt_cargo) for t, _ in tramos)
         y += GAP_NOMBRE_CARGO
         x = (WIDTH - ancho_total) / 2
@@ -297,7 +314,7 @@ def dibujar_identidad(draw, y, paleta, persona):
 
     # Regla corta en olivo bajo el cargo, igual que en la tarjeta web.
     y += GAP_CARGO_REGLA
-    draw.line([(WIDTH / 2 - 59, y), (WIDTH / 2 + 59, y)], fill=paleta["olivo"], width=5)
+    draw.line([(WIDTH / 2 - 59, y), (WIDTH / 2 + 59, y)], fill=paleta["linea"], width=5)
     return y
 
 
@@ -380,24 +397,24 @@ ICONOS = {
 
 def badge_relleno(draw, cx, cy, radio, paleta, icono):
     """Círculo olivo con el icono en crema: el mismo badge de la tarjeta web."""
-    draw.ellipse([cx - radio, cy - radio, cx + radio, cy + radio], fill=paleta["olivo"])
-    ICONOS[icono](draw, cx, cy, radio * 0.52, paleta["crema"], 3)
+    draw.ellipse([cx - radio, cy - radio, cx + radio, cy + radio], fill=paleta["superficie"])
+    ICONOS[icono](draw, cx, cy, radio * 0.52, paleta["sobre_superficie"], 3)
 
 
 def badge_contorno(draw, cx, cy, radio, paleta, icono):
     """Círculo contorneado, como los de la fila de redes en la tarjeta web."""
     draw.ellipse([cx - radio, cy - radio, cx + radio, cy + radio],
-                 outline=paleta["olivo"], width=2)
-    ICONOS[icono](draw, cx, cy, radio * 0.50, paleta["olivo_texto"], 3)
+                 outline=paleta["linea"], width=2)
+    ICONOS[icono](draw, cx, cy, radio * 0.50, paleta["texto_suave"], 3)
 
 
 def dibujar_seccion(draw, y, paleta, titulo, filas):
     """Sección con el mismo armado de la tarjeta web: título en versalitas con la
     regla fina a su derecha, y cada dato con su badge circular, etiqueta y valor."""
     fnt_titulo = fuente("semibold", 24)
-    fin_titulo = texto_espaciado(draw, (MARGEN_X, y), titulo.upper(), fnt_titulo, paleta["olivo_texto"], 6)
+    fin_titulo = texto_espaciado(draw, (MARGEN_X, y), titulo.upper(), fnt_titulo, paleta["texto_suave"], 6)
     medio = y + 16
-    draw.line([(fin_titulo + 18, medio), (MARGEN_X + ANCHO_UTIL, medio)], fill=paleta["olivo"], width=1)
+    draw.line([(fin_titulo + 18, medio), (MARGEN_X + ANCHO_UTIL, medio)], fill=paleta["linea"], width=1)
     y += GAP_TITULO_REGLA + 8
 
     fnt_etiqueta = fuente("semibold", 22)
@@ -408,14 +425,14 @@ def dibujar_seccion(draw, y, paleta, titulo, filas):
     visibles = [f for f in filas if f[2]]
     for indice_fila, (icono, etiqueta, valor) in enumerate(visibles):
         y_inicio = y
-        draw.text((texto_x, y), etiqueta, font=fnt_etiqueta, fill=paleta["olivo_texto"])
+        draw.text((texto_x, y), etiqueta, font=fnt_etiqueta, fill=paleta["texto_suave"])
         y += ALTO_ETIQUETA
 
         # Los valores ya pre-partidos en líneas cortas (la dirección) se dibujan
         # tal cual; el resto se envuelve automáticamente por ancho.
         lineas = valor if isinstance(valor, list) else envolver_texto(draw, valor, fnt_valor, ancho_texto)
         for indice, linea in enumerate(lineas):
-            draw.text((texto_x, y), linea, font=fnt_valor, fill=paleta["carbon"])
+            draw.text((texto_x, y), linea, font=fnt_valor, fill=paleta["texto"])
             y += ALTO_VALOR if indice == 0 and len(lineas) == 1 else ALTO_LINEA_DIRECCION
 
         badge_relleno(draw, MARGEN_X + BADGE_RADIO, (y_inicio + y) / 2 - 4, BADGE_RADIO, paleta, icono)
@@ -423,7 +440,7 @@ def dibujar_seccion(draw, y, paleta, titulo, filas):
         # Línea fina de separación, arrancando después del badge como en la web.
         if indice_fila < len(visibles) - 1:
             y += GAP_ENTRE_FILAS // 2
-            draw.line([(texto_x, y), (MARGEN_X + ANCHO_UTIL, y)], fill=paleta["olivo_claro"], width=1)
+            draw.line([(texto_x, y), (MARGEN_X + ANCHO_UTIL, y)], fill=paleta["linea_suave"], width=1)
             y += GAP_ENTRE_FILAS // 2
         else:
             y += GAP_ENTRE_FILAS
@@ -524,7 +541,7 @@ def dibujar_qr_enmarcado(img, draw, x, y, qr, paleta, lado_marco):
     exacto que le tocó al escalar por módulos, así que se centra en el marco en
     vez de forzarlo a una medida fija."""
     draw.rounded_rectangle(
-        [x, y, x + lado_marco, y + lado_marco], radius=QR_MARCO_RADIO, fill=paleta["carbon"]
+        [x, y, x + lado_marco, y + lado_marco], radius=QR_MARCO_RADIO, fill=paleta["marco_qr"]
     )
     desfase = (lado_marco - qr.width) // 2
     img.paste(qr, (x + desfase, y + desfase))
@@ -533,7 +550,7 @@ def dibujar_qr_enmarcado(img, draw, x, y, qr, paleta, lado_marco):
 def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano, url_publica, salida):
     # RGBA porque la marca de agua se compone con transparencia; al guardar se
     # aplana a RGB.
-    img = Image.new("RGBA", (WIDTH, HEIGHT), paleta["crema"] + (255,))
+    img = Image.new("RGBA", (WIDTH, HEIGHT), paleta["lienzo"] + (255,))
     draw = ImageDraw.Draw(img)
 
     dibujar_cabecera(img, draw, paleta, logo_claro, marca)
@@ -597,7 +614,7 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
             badge_contorno(draw, cx, y + BADGE_RED_RADIO, BADGE_RED_RADIO, paleta, icono)
             ancho = draw.textlength(etiqueta, font=fnt)
             draw.text((cx - ancho / 2, y + 2 * BADGE_RED_RADIO + 14), etiqueta, font=fnt,
-                      fill=paleta["oscuro"])
+                      fill=paleta["texto_secundario"])
         y += 2 * BADGE_RED_RADIO + 52
 
     # Dos QR al final: uno para guardar el contacto, otro para abrir la tarjeta
@@ -622,13 +639,13 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     version = max(version_qr(datos_contacto), version_qr(url_publica))
 
     qr_contacto = generar_qr(
-        datos_contacto, paleta["carbon"], paleta["fondo"], emblema, QR_TAMANO, version
+        datos_contacto, paleta["qr_modulo"], paleta["qr_fondo"], emblema, QR_TAMANO, version
     )
-    qr_tarjeta = generar_qr(url_publica, paleta["carbon"], paleta["fondo"], None, QR_TAMANO, version)
+    qr_tarjeta = generar_qr(url_publica, paleta["qr_modulo"], paleta["qr_fondo"], None, QR_TAMANO, version)
 
     # Red de seguridad por si alguna vez vuelven a diferir (otro contenido, otra
     # marca): antes de enmarcarlos se igualan los lados.
-    qr_contacto, qr_tarjeta = igualar_qr([qr_contacto, qr_tarjeta], paleta["fondo"])
+    qr_contacto, qr_tarjeta = igualar_qr([qr_contacto, qr_tarjeta], paleta["qr_fondo"])
 
     lado_marco = qr_contacto.width + 2 * QR_MARCO_PAD
     # Tres huecos iguales: costado, centro, costado.
@@ -643,19 +660,19 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     caption_y = qr_top + lado_marco + 22
     for x, texto in ((x_izq, "GUARDAR CONTACTO"), (x_der, "TARJETA DIGITAL")):
         ancho = ancho_espaciado(draw, texto, fnt_caption, 3)
-        texto_espaciado(draw, (x + (lado_marco - ancho) / 2, caption_y), texto, fnt_caption, paleta["oscuro"], 3)
+        texto_espaciado(draw, (x + (lado_marco - ancho) / 2, caption_y), texto, fnt_caption, paleta["texto_secundario"], 3)
 
     # Separador vertical entre los dos QR, para reforzar que son dos acciones.
     x_centro = WIDTH // 2
     draw.line(
         [(x_centro, qr_top + 30), (x_centro, qr_top + lado_marco - 30)],
-        fill=paleta["olivo_claro"],
+        fill=paleta["linea_suave"],
         width=2,
     )
 
     # Pie olivo con el sitio web, igual que en la tarjeta web.
     pie_top = HEIGHT - PIE_ALTO
-    draw.rectangle([0, pie_top, WIDTH, HEIGHT], fill=paleta["olivo"])
+    draw.rectangle([0, pie_top, WIDTH, HEIGHT], fill=paleta["pie"])
     if sitio_web_display:
         fnt_pie = fuente("medium", 26)
         texto_pie = sitio_web_display.upper()
@@ -665,7 +682,7 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
             ((WIDTH - ancho_pie) / 2, pie_top + (PIE_ALTO - 30) / 2),
             texto_pie,
             fnt_pie,
-            paleta["fondo"],
+            paleta["sobre_pie"],
             9,
         )
 
@@ -677,27 +694,30 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
 
 
 def paleta_de(ficha):
-    """Paleta del manifiesto, ya validada y sin canal alfa, sobre la de por defecto."""
-    valores = dict(COLORES)
-    valores.update({k: v for k, v in (ficha.get("colores") or {}).items() if v})
-    return {clave: hex_a_rgb(valor) for clave, valor in valores.items()}
+    """Paleta de arte del manifiesto, ya validada y sin canal alfa."""
+    valores = dict(ARTE_RESPALDO)
+    valores.update({k: v for k, v in (ficha.get("arte") or {}).items() if v})
+    return {rol: hex_a_rgb(valor) for rol, valor in valores.items()}
 
 
 def resolver_asset(assets, dist_assets, clave):
     """Ubica un asset declarado en el manifiesto.
 
     Los nombres ya los comprobó build.mjs contra la carpeta de la marca, pero
-    esta función vuelve a exigir que la ruta resuelta cuelgue de la raíz del
-    repo: es la última barrera antes de abrir un archivo del disco y meterlo en
-    una pieza que se publica.
+    esta función vuelve a exigir que la ruta resuelta cuelgue de la carpeta en
+    la que se la buscó: es la última barrera antes de abrir un archivo del disco
+    y meterlo en una pieza que se publica. Se comprueba contra cada base por
+    separado y no contra la raíz del repo, porque con `build.mjs --out` la
+    salida puede estar fuera del árbol —así se sacan las maquetas—.
     """
     nombre = assets.get(clave)
     if not nombre:
         return None
     for carpeta in (dist_assets, ROOT / assets["dir"]):
-        ruta = (carpeta / nombre).resolve()
-        if not ruta.is_relative_to(ROOT):
-            print(f"⚠ {clave}: {ruta} queda fuera del repo, se ignora.")
+        base = carpeta.resolve()
+        ruta = (base / nombre).resolve()
+        if not ruta.is_relative_to(base):
+            print(f"⚠ {clave}: {nombre!r} se sale de {base}, se ignora.")
             return None
         if ruta.exists():
             return ruta
@@ -717,7 +737,8 @@ def main():
         print(f"✗ manifiesto en versión {manifiesto.get('version')!r}; este script espera la 1.")
         return 1
 
-    dist_dir = ROOT / manifiesto["dist"]
+    # El manifiesto guarda su dist relativo a sí mismo.
+    dist_dir = (MANIFIESTO.parent / manifiesto["dist"]).resolve()
 
     for ficha in manifiesto["personas"]:
         slug = ficha["slug"]
@@ -755,7 +776,7 @@ def main():
 
         # Sin emblema al centro: es el QR que se imprime y el que más se escanea,
         # y el logo tapa módulos. El de la vCard sí lo lleva (ver más abajo).
-        generar_qr(url, paleta["carbon"], paleta["fondo"], None, 600).save(out_dir / "qr.png")
+        generar_qr(url, paleta["qr_modulo"], paleta["qr_fondo"], None, 600).save(out_dir / "qr.png")
 
         generar_tarjeta_whatsapp(
             persona, marca, paleta, logo_claro, emblema, plano, url,

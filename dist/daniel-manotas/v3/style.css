@@ -1,0 +1,570 @@
+/* Tarjeta digital — tema v3 "manual".
+   Mismo arte que la v2 —cabecera cortada en chevron sobre una cuña, cuerpo
+   claro, badges circulares y pie— pero pintado con la paleta oficial del manual
+   de marca en vez de con la del roll-up. No cambia ni la información, ni la
+   retícula, ni la geometría del corte: solo el color.
+
+   Por eso este archivo usa únicamente los cinco roles del manual
+   (oscuro/claro/fondo/apoyo/acento) y ninguna variable del roll-up: cada marca
+   rellena esos cinco y el tema funciona sin tocar el CSS. */
+
+/* La tipografía de la marca, servida desde el propio sitio: cargarla de
+   fonts.googleapis.com le entregaba la IP y el User-Agent de quien escanea el
+   QR a un tercero, y dejaba la tarjeta dependiendo de la red para verse bien.
+   El bloque lo emite build.mjs (marcas.json → tipografia) porque la ruta cambia
+   según el tema —el activo la ve en ./assets/ y los secundarios en ../assets/—
+   y porque una marca sin archivo de fuente no debe emitir un @font-face que
+   apunte a nada: en ese caso esto queda vacío y la tarjeta cae a la sans-serif
+   del sistema. */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('../assets/Montserrat-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Respaldo por si faltara el bloque que inyecta card.html: son los del manual
+     de TOPP CREATE, pero cada marca los sobreescribe con los suyos. */
+  --color-oscuro: #121212;  /* Negro Ébano */
+  --color-claro: #8E8B86;   /* Gris Piedra */
+  --color-fondo: #F5F2EB;   /* Marfil */
+
+  --color-apoyo: #C8C1B8;   /* Taupe */
+  --color-acento: #2C2C2C;  /* Grafito */
+
+  --fuente-marca: 'Montserrat', sans-serif;
+  --logo-marca: none;
+
+  /* Geometría del corte de la cabecera, medida sobre el roll-up y normalizada al
+     ancho de la tarjeta. Todo se deriva de --corte-prof (la profundidad total,
+     que es donde llega la punta izquierda del olivo):
+       · cuña   → diagonal simple, sube de izquierda a derecha
+       · bloque → chevron, con el vértice al 20% del ancho
+     La franja queda delgada a la derecha y como cuña ancha a la izquierda,
+     que es justo lo que da el aire del arte original. */
+  --corte-prof: clamp(50px, 9.5vh, 112px);
+  --corte-vertice-x: 20%;
+
+  /* Escala de espaciado — mismo valor en cada transición equivalente.
+     Cada paso va en clamp() contra vh, y el rango es deliberadamente ancho: el
+     máximo es el diseño aireado (pantallas altas y escritorio) y el mínimo es lo
+     más apretado que aguanta sin que los bloques se toquen. Así la tarjeta se
+     descompacta donde hay alto disponible y se cierra en un móvil corto para
+     entrar completa sin scroll, en vez de fijar un alto que solo sirve para un
+     tamaño. */
+  --e-pad-tarjeta: 1.85rem;                      /* margen lateral del cuerpo */
+  --e-cabecera-top: clamp(0.4rem, 2vh, 1.7rem);
+  --e-logo-tagline: clamp(0.28rem, 1.15vh, 0.95rem);
+  --e-cabecera-nombre: clamp(0.45rem, 1.9vh, 1.55rem);
+  --e-nombre-cargo: clamp(0.22rem, 0.8vh, 0.7rem);
+  --e-cargo-bloque: clamp(0.4rem, 1.8vh, 1.55rem);
+  --e-titulo-dato: clamp(0.28rem, 1.2vh, 1.05rem);
+  --e-entre-datos: clamp(0.2rem, 0.98vh, 0.88rem);
+  --e-entre-bloques: clamp(0.4rem, 1.7vh, 1.5rem);
+  --e-bloques-redes: clamp(0.4rem, 1.75vh, 1.55rem);
+  --e-redes-pie: clamp(0.42rem, 2vh, 1.8rem);    /* cierre del cuerpo antes del pie */
+
+  --ancho-tarjeta: 440px;
+  --badge-tamano: clamp(32px, 5vh, 42px);
+  --badge-red-tamano: clamp(32px, 5.2vh, 44px);
+  --marca-corner-tamano: 26px;
+  --marca-corner-margen: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  /* Fondo de página: el crema apenas oscurecido, para que la tarjeta se despegue. */
+  background: #E7E2DA;
+  background: color-mix(in srgb, var(--color-fondo) 84%, var(--color-oscuro) 16%);
+  font-family: var(--fuente-marca);
+  font-weight: 400;
+  color: var(--color-oscuro);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Textura de fondo en pantallas anchas: solo el logotipo repetido en diagonal, muy
+   sutil. background-size respeta la proporción real del logo (no lo deforma) y
+   background-repeat:space reparte las copias con aire parejo para que no se
+   toquen ni se empalmen entre sí. */
+body::before {
+  content: "";
+  display: none;
+  position: fixed;
+  inset: -25%;
+  background-image: var(--logo-marca);
+  background-repeat: space;
+  background-size: 130px 105px;
+  transform: rotate(15deg);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (min-width: 900px) {
+  body::before {
+    display: block;
+  }
+}
+
+.tarjeta {
+  position: relative;
+  z-index: 1;
+  /* Centrado vertical con márgenes automáticos y no con align-items: cuando la
+     tarjeta es más alta que la ventana, align-items:center le corta la parte de
+     arriba (queda fuera del área desplazable); los márgenes auto simplemente se
+     colapsan a cero y la tarjeta se ve completa desde el principio. */
+  margin: auto 0;
+  width: 100%;
+  max-width: var(--ancho-tarjeta);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-fondo);
+  overflow: hidden; /* recorta las capas de la cabecera contra los bordes */
+}
+
+@media (min-width: 480px) {
+  /* El aire mínimo alrededor de la tarjeta va como padding de la página y no como
+     margen de la tarjeta, para no pisar los márgenes auto que la centran. Cede
+     antes que el contenido cuando la ventana es baja. */
+  body {
+    padding: min(2rem, 1.2vh) 0;
+  }
+
+  .tarjeta {
+    box-shadow: 0 18px 50px rgba(36, 41, 45, 0.16);
+  }
+}
+
+/* En pantallas angostas el corte se achica: si no, a 320px de ancho se comería
+   una porción desproporcionada de la cabecera. */
+@media (max-width: 380px) {
+  :root {
+    --corte-prof: clamp(50px, 10vh, 92px);
+    --e-pad-tarjeta: 1.2rem;
+  }
+}
+
+/* ── Cabecera ────────────────────────────────────────────────────────────── */
+.cabecera {
+  position: relative;
+  /* Capa de abajo: el olivo, con corte diagonal simple. */
+  background: var(--color-apoyo);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--corte-prof) * 0.9),
+    0 100%
+  );
+  padding: var(--e-cabecera-top) var(--e-pad-tarjeta)
+           calc(var(--corte-prof) + 0.5rem);
+}
+
+/* Capa de encima: el carbón, con corte en chevron. */
+.cabecera::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-oscuro);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--corte-prof)),
+    var(--corte-vertice-x) calc(100% - var(--corte-prof) * 0.25),
+    0 calc(100% - var(--corte-prof) * 0.52)
+  );
+}
+
+.cabecera__contenido {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.cabecera .logo {
+  display: block;
+  margin: 0 auto;
+  width: clamp(78px, 14vh, 142px);
+  max-width: 50%;
+  height: auto;
+}
+
+.logo-fallback {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 1.15rem;
+  color: var(--color-fondo);
+}
+
+/* Tagline: palabras en claro y separadores en olivo, como el original. */
+.cabecera__tagline {
+  margin: var(--e-logo-tagline) 0 0;
+  font-size: 0.64rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-fondo);
+}
+
+.cabecera__tagline .sep {
+  color: var(--color-claro);
+  padding: 0 0.35em;
+}
+
+/* ── Cuerpo ──────────────────────────────────────────────────────────────── */
+.cuerpo {
+  position: relative;
+  padding: var(--e-cabecera-nombre) var(--e-pad-tarjeta) 0;
+}
+
+/* El contenido del cuerpo va sobre el plano de fondo. */
+.cuerpo > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Marca de esquina tipo plano arquitectónico — se conserva de la v1. */
+.cuerpo::before {
+  content: "";
+  position: absolute;
+  top: var(--marca-corner-margen);
+  left: var(--marca-corner-margen);
+  width: var(--marca-corner-tamano);
+  height: var(--marca-corner-tamano);
+  border-top: 1px solid var(--color-apoyo);
+  border-left: 1px solid var(--color-apoyo);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Plano de fondo: lo genera scripts/generar_planos.py. Cubre todo el rectángulo
+   del cuerpo a muy baja opacidad — da el aire de estudio de arquitectura sin
+   competir con la información. El prototipo se elige en marcas.json. */
+.cuerpo::after {
+  content: "";
+  position: absolute;
+  /* Arranca por encima del nombre, tucado bajo el corte de la cabecera. */
+  top: -1.75rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: var(--fondo-plano);
+  /* El fondo es un pliego vertical (varias vistas apiladas) con la proporción de
+     la tarjeta: entra completo a lo ancho —sin recorte lateral— y cubre todo el
+     alto de una sola pasada, sin repetirse. Con "cover" el trazo salía grueso y
+     competía con el texto; con repeat-y se veía el empalme. */
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% auto;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.identidad {
+  margin-bottom: var(--e-cargo-bloque);
+  text-align: center;
+}
+
+.identidad__nombre {
+  margin: 0;
+  /* Una sola línea: el cuerpo se adapta al ancho para que "Daniel J. Manotas C."
+     entre completo también en pantallas de 320px. El máximo bajó de 6.1vw al
+     sumarse la flecha de descarga al final de la línea. */
+  font-size: clamp(1.25rem, 5.6vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+/* El nombre es el enlace de descarga de la imagen. El subrayado punteado va bajo
+   el texto (no bajo la flecha) y en olivo, para que se lea como interactivo sin
+   competir con el peso del nombre. */
+.identidad__descarga {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* La flecha es toda la señal de que el nombre es descargable: un subrayado bajo
+   el nombre se leía como suciedad tipográfica y no como enlace. */
+.identidad__icono {
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.3em;
+  vertical-align: 0.02em;
+  color: var(--color-acento);
+  transition: transform 0.15s ease;
+}
+
+.identidad__descarga:hover .identidad__icono {
+  transform: translateY(2px);
+}
+
+.identidad__descarga:hover .identidad__apellidos {
+  color: var(--color-acento);
+}
+
+.identidad__pila {
+  color: var(--color-oscuro);
+}
+
+.identidad__apellidos {
+  color: var(--color-claro);
+  transition: color 0.15s ease;
+}
+
+.identidad__cargo {
+  margin: var(--e-nombre-cargo) 0 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-acento);
+}
+
+/* Barra entre cargo y profesión. En olivo claro y con aire a los lados para que
+   separe sin leerse como un carácter más del texto. */
+.identidad__sep {
+  color: var(--color-claro);
+  font-weight: 400;
+  padding: 0 0.5em;
+}
+
+/* Con las dos partes, el bloque se centra por la barra y no por el ancho del
+   texto: "Co-Fundador" es más largo que "Arquitecto", así que centrar la línea
+   completa deja la barra corrida a la izquierda y se lee como desalineada
+   respecto de la regla olivo de abajo. Las dos columnas 1fr son iguales por
+   definición, así que la barra cae en el eje exacto de la tarjeta. */
+.identidad__cargo:has(.identidad__sep) {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+}
+
+.identidad__cargo:has(.identidad__sep) .identidad__cargo-parte:first-child {
+  justify-self: end;
+}
+
+.identidad__cargo:has(.identidad__sep) .identidad__cargo-parte:last-child {
+  justify-self: start;
+}
+
+.identidad__regla {
+  display: block;
+  width: 50px;
+  height: 2px;
+  margin: clamp(0.45rem, 1vh, 0.8rem) auto 0;
+  background: var(--color-acento);
+}
+
+/* ── Bloques de contacto (Personal arriba, Empresa abajo) ────────────────── */
+.bloque + .bloque {
+  margin-top: var(--e-entre-bloques);
+}
+
+.bloque__titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 var(--e-titulo-dato);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-acento);
+}
+
+/* Regla fina que completa el ancho a la derecha del título. */
+.bloque__titulo::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-acento);
+  opacity: 0.45;
+}
+
+.contactos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contacto {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.contacto--direccion {
+  align-items: flex-start;
+}
+
+.contacto--direccion .contacto__badge {
+  margin-top: 0.2rem;
+}
+
+.contacto__badge {
+  flex: none;
+  width: var(--badge-tamano);
+  height: var(--badge-tamano);
+  border-radius: 50%;
+  background: var(--color-apoyo);
+  color: var(--color-oscuro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.contacto__badge svg {
+  width: 52%;
+  height: 52%;
+}
+
+/* Línea fina bajo cada dato, arrancando después del badge — como el original. */
+.contacto__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--e-entre-datos) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-acento) 35%, transparent);
+}
+
+.contacto:last-child .contacto__texto {
+  border-bottom: none;
+}
+
+.contacto__etiqueta {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--color-acento);
+}
+
+.contacto__valor {
+  font-size: clamp(0.78rem, 3.35vw, 0.95rem);
+  font-weight: 400;
+  line-height: 1.38;
+  color: var(--color-oscuro);
+  text-decoration: none;
+  word-break: break-word;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.contacto__valor:hover {
+  border-bottom-color: var(--color-acento);
+}
+
+/* ── Redes ───────────────────────────────────────────────────────────────── */
+/* Grilla de columnas iguales: así los tres círculos quedan a distancias
+   homogéneas entre sí y respecto de los bordes, independiente de lo que mida
+   cada etiqueta (con flex, "toppcreate.com" empujaba y descentraba la fila). */
+.redes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: var(--e-bloques-redes) 0 var(--e-redes-pie);
+}
+
+.red {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.red__badge {
+  width: var(--badge-red-tamano);
+  height: var(--badge-red-tamano);
+  border-radius: 50%;
+  border: 1px solid var(--color-acento);
+  color: var(--color-acento);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.red__badge svg {
+  width: 50%;
+  height: 50%;
+}
+
+.red__etiqueta {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-acento);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.red:hover .red__badge {
+  background: var(--color-oscuro);
+  color: var(--color-fondo);
+}
+
+/* ── Pie: la acción principal ────────────────────────────────────────────── */
+/* Antes el pie era solo la firma del sitio web y el botón vivía en el cuerpo.
+   Ahora el pie ES el botón: la franja olivo entera es el área clicable, así que
+   se compacta el alto — sin el texto de firma no necesita tanto aire. */
+.pie {
+  background: var(--color-oscuro);
+  transition: background-color 0.15s ease;
+}
+
+.pie__accion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: clamp(0.5rem, 1.7vh, 1.15rem) 1rem;
+  color: var(--color-fondo);
+  font-family: var(--fuente-marca);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+}
+
+.pie__icono {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.pie:hover {
+  background: var(--color-acento);
+}
+
+/* Accesibilidad */
+a:focus-visible {
+  outline: 2px solid var(--color-oscuro);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

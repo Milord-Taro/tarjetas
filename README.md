@@ -16,8 +16,9 @@ assets/
   personas/<slug>/   # recursos individuales de cada persona (foto, etc.)
   fuentes/           # Montserrat variable, para que los PNG usen la tipografía corporativa
 templates/
-  v1/                # tema original: monocromático, colores principales del manual
-  v2/                # tema actual: paleta secundaria del roll-up (carbón + olivo + crema)
+  v1/                # legacy, no se mantiene
+  v2/                # tema activo: paleta del roll-up (carbón + olivo + crema)
+  v3/                # mismo arte que la v2 con la paleta oficial del manual
 scripts/
   validar.mjs           # esquema de data/ + validador (lo corre build.mjs y CI)
   build.mjs             # genera dist/ a partir de data/
@@ -248,11 +249,47 @@ que está construido el tema **v2**, que es el que se publica. Los tonos
 `olivo_texto` y `olivo_claro` son variantes de contraste del mismo olivo, para
 que el texto pequeño cumpla AA sobre crema y sobre carbón.
 
-Por eso conviven las dos paletas: **v1 usa solo el manual** (por eso siguió al
-manual nuevo en cuanto cambió `colores`) y **v2 usa casi solo el roll-up** (28
-usos contra 6). El manual nuevo no tiene olivo, así que llevar la tarjeta
-publicada a la paleta nueva es rehacer su arte, no cambiar unos valores: eso
-será un tema `v3` aparte, y la v2 se queda como está mientras tanto.
+Por eso conviven las dos paletas: la **v2** está construida casi entera sobre el
+roll-up (28 usos contra 6 del manual) y la **v3** solo sobre el manual. El
+manual no tiene olivo, así que llevar la tarjeta a la paleta nueva no es cambiar
+unos valores sino repintar el arte — que es justo lo que es la v3.
+
+### El arte, por roles
+
+La imagen para WhatsApp dibuja la misma pieza que la tarjeta web, así que
+también tiene que saber qué color va en cada parte. Eso se declara en
+`build.mjs` → `ARTE_POR_TEMA`, por **rol** y no por color:
+
+| Rol | Qué es | v2 | v3 |
+|---|---|---|---|
+| `lienzo` | fondo del cuerpo | crema | Marfil |
+| `bloque` | cabecera en chevron | carbón | Negro Ébano |
+| `cuna` | franja bajo la cabecera | olivo | Taupe |
+| `superficie` | badges rellenos | olivo | Taupe |
+| `texto` | nombre y valores | carbón | Negro Ébano |
+| `texto_suave` | títulos y etiquetas | olivo texto | Grafito |
+| `texto_secundario` | cargo, pies de QR | oscuro | Grafito |
+| `realce` | apellidos | olivo | Gris Piedra |
+| `linea` | reglas | olivo | Grafito |
+| `linea_suave` | separaciones finas | olivo claro | Gris Piedra |
+| `pie` | banda inferior | olivo | Negro Ébano |
+| `marco_qr` | marco de los códigos | carbón | Grafito |
+
+El manifiesto lleva ya resuelta la paleta del tema activo, así que un tema nuevo
+no obliga a tocar `generar_imagenes.py`.
+
+Dos decisiones de la v3 que vienen del contraste, no del gusto: el **realce**
+(los apellidos) es Gris Piedra porque el manual no tiene un acento cromático y
+la distinción hay que hacerla por valor — funciona porque es texto grande, a
+3.04:1—; y el **texto pequeño** va en Grafito y nunca en Gris Piedra, que sobre
+marfil no llega al 4.5:1 que pide AA.
+
+Para sacar una maqueta de un tema sin tocar lo publicado:
+
+```bash
+node scripts/build.mjs --data /tmp/m/data --out /tmp/m/dist   # con "tema" cambiado
+python3 scripts/generar_imagenes.py /tmp/m/build/manifiesto.json
+```
 
 ## Tipografía
 
