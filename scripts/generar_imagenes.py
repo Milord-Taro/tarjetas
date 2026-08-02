@@ -268,10 +268,23 @@ def dibujar_identidad(draw, y, paleta, persona):
         draw.text((x + ancho_pila + separacion, y), apellidos, font=fnt, fill=paleta["olivo"])
     y += NOMBRE_INTERLINEA - 4
 
-    cargo = persona.get("cargo") or ""
-    if cargo:
+    # Cargo y profesión en la misma línea, separados por una barra en olivo claro.
+    # Se dibuja por tramos porque cada uno lleva su color (PIL pinta de un color
+    # por llamada); si no hay profesión, es un solo tramo y no aparece la barra.
+    partes = [p for p in (persona.get("cargo"), persona.get("profesion")) if p]
+    if partes:
+        fnt_cargo = fuente("medium", 36)
+        tramos = []
+        for i, parte in enumerate(partes):
+            if i:
+                tramos.append(("  |  ", paleta["olivo_claro"]))
+            tramos.append((parte, paleta["oscuro"]))
+        ancho_total = sum(draw.textlength(t, font=fnt_cargo) for t, _ in tramos)
         y += GAP_NOMBRE_CARGO
-        texto_centrado(draw, y, cargo, fuente("medium", 36), paleta["oscuro"])
+        x = (WIDTH - ancho_total) / 2
+        for texto, color in tramos:
+            draw.text((x, y), texto, font=fnt_cargo, fill=color)
+            x += draw.textlength(texto, font=fnt_cargo)
         y += 44
 
     # Regla corta en olivo bajo el cargo, igual que en la tarjeta web.
@@ -412,7 +425,15 @@ def dibujar_seccion(draw, y, paleta, titulo, filas):
 QR_BOX = 10
 
 
-def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None):
+def version_qr(datos):
+    """Versión (tamaño en módulos) que le toca a este contenido por sí solo."""
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=QR_BOX, border=2)
+    qr.add_data(datos)
+    qr.make(fit=True)
+    return qr.version
+
+
+def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None, version=None):
     """QR con corrección alta para poder incrustar el emblema al centro sin
     perder legibilidad (así lo muestra el arte aprobado).
 
@@ -421,7 +442,9 @@ def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None):
     difusos y la cámara deja de leer el código apenas la imagen se ve pequeña —
     era el caso del QR del vCard, que por ser una URL más larga tiene más módulos.
     """
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=QR_BOX, border=2)
+    qr = qrcode.QRCode(
+        version=version, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=QR_BOX, border=2
+    )
     qr.add_data(datos)
     qr.make(fit=True)
     img = qr.make_image(fill_color=color_fill, back_color=color_back).convert("RGB")
@@ -455,6 +478,28 @@ def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None):
         fondo.paste(logo, ((hueco - logo.width) // 2, (hueco - logo.height) // 2), logo)
         img.paste(fondo, ((lado - fondo.width) // 2, (lado - fondo.height) // 2))
     return img
+
+
+def igualar_qr(codigos, color_back):
+    """Deja todos los QR del mismo lado, centrándolos sobre un lienzo del color de
+    fondo del código.
+
+    Cada QR se escala a un múltiplo exacto de sus módulos, y como dos códigos con
+    distinta cantidad de datos tienen distinta cantidad de módulos, terminan con
+    anchos distintos: puestos en marcos iguales, uno se ve con más borde que el
+    otro. Se iguala agrandando la zona de silencio del más pequeño —blanco de
+    más, que no estorba la lectura— en vez de reescalar, que emborronaría los
+    módulos."""
+    lado = max(qr.width for qr in codigos)
+    iguales = []
+    for qr in codigos:
+        if qr.width == lado:
+            iguales.append(qr)
+            continue
+        lienzo = Image.new("RGB", (lado, lado), color_back)
+        lienzo.paste(qr, ((lado - qr.width) // 2, (lado - qr.height) // 2))
+        iguales.append(lienzo)
+    return iguales
 
 
 def dibujar_qr_enmarcado(img, draw, x, y, qr, paleta, lado_marco):
@@ -535,33 +580,48 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
                       fill=paleta["oscuro"])
         y += 2 * BADGE_RED_RADIO + 52
 
-    # Dos QR al final: uno para guardar el contacto, otro para el sitio web.
-    # (A diferencia de la tarjeta web, aquí nada es clicable — cada QR reemplaza
-    # la acción que en la web sería un elemento interactivo.)
+    # Dos QR al final: uno para guardar el contacto, otro para abrir la tarjeta
+    # digital. (A diferencia de la tarjeta web, aquí nada es clicable — cada QR
+    # reemplaza la acción que en la web sería un elemento interactivo.)
+    #
+    # El segundo QR llevaba el sitio web, que ya está en texto plano arriba. El de
+    # la tarjeta va sin emblema al centro: es el que más se escanea y el logo, aun
+    # con corrección de errores alta, le quita módulos legibles.
     #
     # Van pegados a los márgenes y con un separador en medio: si quedan juntos, la
     # cámara los toma dentro del mismo encuadre y no se sabe cuál va a leer.
     qr_top = y + GAP_REDES_QR
-    qr_contacto = generar_qr(
-        f"{url_publica.rstrip('/')}/contacto.vcf", paleta["carbon"], paleta["fondo"], emblema, QR_TAMANO
-    )
-    qr_sitio = generar_qr(
-        marca.get("sitio_web") or url_publica, paleta["carbon"], paleta["fondo"], emblema, QR_TAMANO
-    )
+    datos_contacto = f"{url_publica.rstrip('/')}/contacto.vcf"
 
-    # Los dos marcos comparten medida, tomada del QR más grande de los dos.
-    lado_marco = max(qr_contacto.width, qr_sitio.width) + 2 * QR_MARCO_PAD
+    # Los dos se fuerzan a la misma versión de QR — la que necesita el más largo
+    # de los dos, el del vCard. Con distinta versión tienen distinta cantidad de
+    # módulos y, como cada uno se escala a un múltiplo entero de los suyos, el
+    # más corto terminaba bastante más pequeño y rodeado de blanco. A misma
+    # versión, mismos módulos, mismo escalado y misma medida exacta. La URL corta
+    # simplemente viaja con más relleno, que no afecta la lectura.
+    version = max(version_qr(datos_contacto), version_qr(url_publica))
+
+    qr_contacto = generar_qr(
+        datos_contacto, paleta["carbon"], paleta["fondo"], emblema, QR_TAMANO, version
+    )
+    qr_tarjeta = generar_qr(url_publica, paleta["carbon"], paleta["fondo"], None, QR_TAMANO, version)
+
+    # Red de seguridad por si alguna vez vuelven a diferir (otro contenido, otra
+    # marca): antes de enmarcarlos se igualan los lados.
+    qr_contacto, qr_tarjeta = igualar_qr([qr_contacto, qr_tarjeta], paleta["fondo"])
+
+    lado_marco = qr_contacto.width + 2 * QR_MARCO_PAD
     # Tres huecos iguales: costado, centro, costado.
     hueco = (WIDTH - 2 * lado_marco) / 3
     x_izq = int(hueco)
     x_der = int(2 * hueco + lado_marco)
 
     dibujar_qr_enmarcado(img, draw, x_izq, qr_top, qr_contacto, paleta, lado_marco)
-    dibujar_qr_enmarcado(img, draw, x_der, qr_top, qr_sitio, paleta, lado_marco)
+    dibujar_qr_enmarcado(img, draw, x_der, qr_top, qr_tarjeta, paleta, lado_marco)
 
     fnt_caption = fuente("medium", 26)
     caption_y = qr_top + lado_marco + 22
-    for x, texto in ((x_izq, "GUARDAR CONTACTO"), (x_der, "SITIO WEB")):
+    for x, texto in ((x_izq, "GUARDAR CONTACTO"), (x_der, "TARJETA DIGITAL")):
         ancho = ancho_espaciado(draw, texto, fnt_caption, 3)
         texto_espaciado(draw, (x + (lado_marco - ancho) / 2, caption_y), texto, fnt_caption, paleta["oscuro"], 3)
 
@@ -652,8 +712,10 @@ def main():
 
         url = url_publica_de(persona, base_url)
 
+        # Sin emblema al centro: es el QR que se imprime y el que más se escanea,
+        # y el logo tapa módulos. El de la vCard sí lo lleva (ver más abajo).
         qr_path = out_dir / "qr.png"
-        generar_qr(url, paleta["carbon"], paleta["fondo"], emblema, 600).save(qr_path)
+        generar_qr(url, paleta["carbon"], paleta["fondo"], None, 600).save(qr_path)
 
         whatsapp_path = out_dir / "tarjeta-whatsapp.png"
         generar_tarjeta_whatsapp(

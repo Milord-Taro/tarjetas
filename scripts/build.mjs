@@ -131,6 +131,9 @@ function construirVCard({ persona, marca }) {
   ];
   if (marca?.nombre) lineas.push(`ORG:${escapeVCard(marca.nombre)}`);
   if (persona.cargo) lineas.push(`TITLE:${escapeVCard(persona.cargo)}`);
+  // El cargo es la posición en la empresa; la profesión es aparte y en vCard va
+  // en ROLE, no concatenada en TITLE (así se importa limpia en la agenda).
+  if (persona.profesion) lineas.push(`ROLE:${escapeVCard(persona.profesion)}`);
   if (persona.whatsapp) lineas.push(`TEL;TYPE=CELL:+${persona.whatsapp}`);
   if (marca?.whatsapp) lineas.push(`TEL;TYPE=WORK:+${marca.whatsapp}`);
   if (persona.email) lineas.push(`EMAIL:${escapeVCard(persona.email)}`);
@@ -235,6 +238,7 @@ for (const persona of personas) {
   const camposEscapables = {
     nombre: persona.nombre,
     cargo: persona.cargo,
+    profesion: persona.profesion,
     slug: persona.slug,
     'persona.nombre_pila': nombrePartido.pila,
     'persona.apellidos': nombrePartido.apellidos,
@@ -268,6 +272,14 @@ for (const persona of personas) {
   valoresBase['marca.tagline_html'] = taglineHtml(marca.tagline);
   valoresBase['marca.direccion_html'] = direccionAHtml(marca.direccion);
   valoresBase['marca.mapa_url'] = escapeHtml(mapaUrl(marca.nombre, marca.direccion));
+
+  // Cargo y profesión van en la misma línea separados por una barra. Se arma aquí
+  // y no en la plantilla porque la barra solo debe aparecer si existen los dos.
+  const cargoPartes = [persona.cargo, persona.profesion].filter(Boolean);
+  valoresBase.cargo_texto = escapeHtml(cargoPartes.join(' | '));
+  valoresBase.cargo_html = cargoPartes
+    .map((parte) => `<span class="identidad__cargo-parte">${escapeHtml(parte)}</span>`)
+    .join('<span class="identidad__sep" aria-hidden="true">|</span>');
   valoresBase.logo_marca_css = [
     logoFile ? `--logo-marca: url('./assets/${encodeURIComponent(logoFile)}');` : '',
     fondoPlanoFile ? `--fondo-plano: url('./assets/${encodeURIComponent(fondoPlanoFile)}');` : '',
