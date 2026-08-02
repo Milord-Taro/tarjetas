@@ -39,7 +39,7 @@ jobs:
       # que se revisó este workflow. El comentario deja a la vista qué versión es
       # cada SHA; para actualizar, se mueve el par SHA + comentario a la vez.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: '22'
 
