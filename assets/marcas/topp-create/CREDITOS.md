@@ -31,3 +31,30 @@ y apilar las vistas a un mismo ancho.
 
 El resto de assets de esta carpeta (logotipos, `edificio-linea.*`,
 `fondo-plano-planta/implantacion/reticula/alzado`) son propios del proyecto.
+
+## Entrega de agosto de 2026: iconografía y logos vectoriales
+
+`iconos/*` y `logo-vertical.svg` / `logo-horizontal.svg` los entregó el equipo
+de diseño de TOPP CREATE. Son obra propia de la marca.
+
+Cambios hechos al importarlos, todos mecánicos y anotados aquí para poder
+pedirlos corregidos en origen:
+
+- **Nombres a minúscula y sin tildes.** `Ubicación.svg` → `ubicacion.svg`: el
+  validador del build solo admite `[A-Za-z0-9_.-]` en nombres de archivo, así
+  que con la tilde el archivo no se puede referenciar desde `marcas.json`.
+- **Fondo blanco quitado de los SVG.** Los siete venían con un
+  `<rect width="150" height="150" fill="white"/>` a pantalla completa detrás
+  del dibujo. Con eso el icono no se puede poner sobre la cabecera oscura de la
+  propia marca: se ve un cuadrado blanco. Los PNG sí venían transparentes.
+- **De la carpeta `JPG` no se tomó nada.** No eran JPG sino PNG de 297 px, y a
+  diferencia de los de 150 px venían con el fondo blanco incrustado.
+
+Sin tocar, para que lo decida diseño:
+
+- **El trazo es de 1 a 1.5 sobre un lienzo de 150** (≈1 % del alto). A los 32 px
+  que miden en la tarjeta eso queda por debajo de medio píxel y el dibujo se
+  deshace. Se comprobó que engrosándolo a ~2–3 % vuelven a leerse todos.
+- **El color va fijo en el SVG** (`stroke="#1D1D1B"`), así que el icono no puede
+  tomar el color del tema. Los logos usan `#2C3235`, que tampoco es ninguno de
+  los cinco del manual.

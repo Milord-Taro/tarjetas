@@ -41,7 +41,8 @@ marcas no dependa de recordar cómo se hizo la vez pasada.
 | **slug** | `nombre-apellido`, minúsculas sin tildes, 3–40 caracteres | sí — y que sea único y no choque con `index`, `assets`, `robots` ni con un nombre de tema |
 | **id de marca** | igual que el slug (`topp-create`) | sí |
 | **correo** | el que fije cada marca; en TOPP CREATE, `arq.nombre@toppcreate.com` | el dominio sí, contra `dominios_correo` de la marca; el prefijo no |
-| **logos** | `logo-{vertical\|horizontal\|emblema}-{gris\|blanco}.png` en `assets/marcas/<id>/` | no — pero si falta el declarado, el build busca por esos nombres |
+| **logos** | `logo-{vertical\|horizontal\|emblema}-{gris\|blanco}.png` en `assets/marcas/<id>/`; el vectorial sin sufijo de color (`logo-vertical.svg`) | no — pero si falta el declarado, el build busca por esos nombres |
+| **iconos** | `assets/marcas/<id>/iconos/`, minúscula y sin tildes, SVG + PNG | no — todavía no los consume ninguna plantilla |
 | **fuentes** | `assets/marcas/<id>/fuentes/`, o `assets/fuentes/` si es compartida | sí — que exista y que declare licencia |
 | **procedencia** | `CREDITOS.md` por marca, con licencia de cada asset de terceros | no |
 
