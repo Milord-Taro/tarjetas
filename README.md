@@ -19,11 +19,14 @@ templates/
   v1/                # tema original: monocromático, colores principales del manual
   v2/                # tema actual: paleta secundaria del roll-up (carbón + olivo + crema)
 scripts/
+  validar.mjs           # esquema de data/ + validador (lo corre build.mjs y CI)
   build.mjs             # genera dist/ a partir de data/
   generar_imagenes.py   # genera QR + imagen para WhatsApp
   generar_edificio.py   # axonométrico de línea (asset alternativo de fondo)
   generar_planos.py     # prototipos de plano dibujados por código (alternativas de fondo)
   preparar_plano_fondo.py # procesa el plano HABS de dominio público que se usa de fondo
+test/                # casos hostiles del esquema y del build (node --test test/*.test.mjs)
+build/               # manifiesto intermedio build.mjs → generar_imagenes.py (no se versiona)
 dist/                # salida generada, no se edita a mano (se publica en GitHub Pages)
 ```
 
@@ -68,19 +71,56 @@ dato que se publique: son datos personales de un tercero y aplica la Ley 1581 de
 
 Hoy los JSON los escribe quien mantiene el repo, pero la idea es que cada
 profesional aporte su ficha (por PR o por un formulario). Desde ese momento
-`data/` es entrada no confiable, así que `build.mjs` valida antes de emitir:
+`data/` es entrada no confiable. El esquema y su validador viven en
+`scripts/validar.mjs`, que se puede correr solo (`node scripts/validar.mjs`) y
+que `build.mjs` ejecuta antes de generar nada.
+
+Hay dos severidades, y la diferencia importa:
+
+**Duro — el build no publica nada.** Los campos que deciden identidad y rutas
+de archivo. Un valor raro aquí no es una tarjeta fea: es un archivo escrito
+donde no va, o la ficha de alguien publicada bajo el nombre de otro.
+
+| Campo | Qué se acepta | Por qué |
+|---|---|---|
+| `slug`, `marca_id`, `id` | minúsculas, dígitos y guiones simples | son nombres de carpeta: un `..` escribía fuera de `dist/` y copiaba al sitio imágenes de cualquier parte del disco |
+| `slug` | no puede ser `index`, `assets`, `robots`… ni un nombre de tema | chocaría con algo que el build ya escribe, o con `dist/{slug}/{tema}/` |
+| `slug` | único entre todas las fichas | dos iguales se pisaban en silencio y el índice enlazaba a la primera con la tarjeta de la segunda |
+| `nombre` | obligatorio y no vacío | ausente reventaba con un stack de Node; en blanco publicaba la tarjeta con el hueco vacío, sin avisar |
+| `logo`, `logo_claro`, `logo_emblema`, `fondo_plano*` | un nombre plano, sin `/` ni `..` | se concatenan con `path.join` y se copian a `dist/`, que es lo que se publica |
+| `base_url` | una URL `https` | va grabada dentro del QR impreso |
+| *cualquier campo no listado* | se rechaza | sin esto, una ficha cuela datos que nadie revisó y que igual quedan en `data/` y en el historial |
+
+**Blando — se avisa y se usa el valor por defecto.** Los campos de contenido:
+que una marca escriba mal su color no debería dejar a las demás personas sin
+publicar.
 
 | Campo | Qué se acepta | Por qué |
 |---|---|---|
 | `sitio_web`, `linkedin` | solo `https:`, `http:`, `mailto:`, `tel:` | escapar no impide un `javascript:` en un `href` |
 | `colores.*`, `tipografia` | `#rgb`…`#rrggbbaa`, y nombres alfanuméricos | van dentro de `<style>`, donde el navegador no decodifica entidades: un `;` o un `}` dejarían inyectar reglas nuevas, incluido un `url()` externo |
-| `logo`, `logo_claro`, `fondo_plano` | un nombre plano, sin `/` ni `..` | se concatenan con `path.join` y se copian a `dist/`, que es lo que se publica |
 | `whatsapp`, `email`, `instagram` | dígitos / correo / usuario | se concatenan dentro de URLs que arma el build |
 
-Lo que no pasa la validación se descarta con un aviso en consola y se cae al
-valor por defecto; el build no falla. Hay una prueba manual rápida: meter valores
-hostiles en `marcas.json`, correr `node scripts/build.mjs` y comprobar que
-avisa por cada uno y que nada de eso aparece en `dist/`.
+Los colores se normalizan a `#rrggbb` en un solo sitio. Antes cada consumidor
+los interpretaba por su cuenta y no coincidían: un `#fff` —válido en CSS y
+aceptado por el build— hacía reventar `generar_imagenes.py` a mitad de la
+corrida, y las personas que venían después se quedaban sin QR.
+
+Todo esto está cubierto por `test/`: cada caso salió de un agujero real, así que
+son regresiones. `node --test test/*.test.mjs`.
+
+### El manifiesto
+
+`generar_imagenes.py` **no lee `data/`**. Lo hacía, y era el hueco grande: toda
+la validación vive en `build.mjs`, así que un dato que la tarjeta web rechazaba
+llegaba al PNG intacto. En concreto, un campo `url_publica` en la ficha decidía
+qué URL quedaba grabada en el QR —lo que se imprime y lo que nadie revisa a
+ojo— mientras la tarjeta web se veía legítima.
+
+Ahora `build.mjs` emite `build/manifiesto.json` con las fichas ya validadas y
+normalizadas, y ese es el único insumo del script de imágenes. La URL la calcula
+el build a partir de `base_url` + `slug`, y la ficha no puede influir en ella.
+El manifiesto no se versiona: es intermedio, no es lo que se publica.
 
 ### Terceros y publicación
 
@@ -126,9 +166,14 @@ pequeño cumpla AA sobre crema y sobre carbón.
 
 ```bash
 python3 scripts/preparar_plano_fondo.py  # solo si se cambia el plano de fondo
-node scripts/build.mjs                # HTML + CSS + vCard de cada persona
-python3 scripts/generar_imagenes.py   # QR + imagen para WhatsApp (corre después del build)
+node scripts/validar.mjs              # opcional: revisa data/ sin generar nada
+node scripts/build.mjs                # HTML + CSS + vCard + build/manifiesto.json
+python3 scripts/generar_imagenes.py   # QR + imagen para WhatsApp (lee el manifiesto)
+node --test test/*.test.mjs           # casos hostiles del esquema y del build
 ```
+
+El orden importa: `generar_imagenes.py` falla con un mensaje claro si no
+encuentra `build/manifiesto.json`.
 
 El fondo en uso es un pliego vertical compuesto con dos levantamientos HABS de
 dominio público (Healy Building de Georgetown y Binghamton City Hall),
@@ -175,6 +220,26 @@ El sitio vive en GitHub Pages: <https://milord-taro.github.io/tarjetas/>.
 push a `main`. El build **no** corre en CI a propósito: `generar_imagenes.py`
 depende de Pillow y de la fuente local, y el QR conviene revisarlo a ojo antes de
 que se imprima. Entonces el ciclo es: regenerar en local → revisar → commit → push.
+
+Lo que sí corre en CI es la comprobación de que el `dist/` commiteado
+corresponde al `data/` commiteado: se recompila a un temporal y se compara. Si
+no cuadra, no despliega. Antes eso se sostenía solo en la disciplina de quien
+publicaba.
+
+El trigger **no** lleva filtro `paths:`. Lo llevaba, y a cambio de ahorrar
+despliegues que no cambiaban nada abría una avería silenciosa: un force push no
+disparó el workflow y el sitio siguió sirviendo datos viejos durante horas, sin
+ninguna señal —Pages sigue publicando el último despliegue exitoso, así que "no
+corrió" y "corrió sin cambios" se ven igual desde fuera—. El force push es
+además la maniobra con la que se purgan datos personales del historial: es justo
+el momento en el que no se puede depender de que el filtro acierte. Si hace
+falta forzar un despliegue, `workflow_dispatch` desde la pestaña Actions.
+
+`.github/workflows/validar.yml` revisa las fichas que llegan por PR (esquema,
+tests, que el build no escriba fuera de su directorio). Es `pull_request` y no
+`pull_request_target`, a propósito: `pull_request_target` corre con el token del
+repo base sobre código que nadie ha revisado todavía. Este workflow no despliega
+y no usa secretos.
 
 `dist/index.html` y `dist/.nojekyll` los genera `build.mjs`. El primero redirige
 la raíz a la única tarjeta (o lista todas, si hay varias); el segundo evita que

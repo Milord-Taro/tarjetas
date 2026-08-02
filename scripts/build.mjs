@@ -6,13 +6,43 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  validarDatos,
+  formatear,
+  RE_SLUG,
+  RE_COLOR,
+  RE_TIPOGRAFIA,
+  RE_NOMBRE_ARCHIVO,
+  RE_USUARIO,
+  RE_CORREO,
+  ESQUEMAS_PERMITIDOS,
+} from './validar.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const DATA_DIR = path.join(ROOT, 'data');
 const ASSETS_DIR = path.join(ROOT, 'assets');
 const TEMPLATES_DIR = path.join(ROOT, 'templates');
-const DIST_DIR = path.join(ROOT, 'dist');
+
+// --out compila a otro directorio sin tocar dist/: lo usa el workflow para
+// comprobar que el dist/ commiteado corresponde de verdad al data/ commiteado
+// (hasta ahora eso se sostenía solo en la disciplina de quien publica).
+// --data lee las fichas de otro sitio: lo usan los tests para compilar fichas
+// hostiles sin ensuciar data/.
+function opcion(nombre, porDefecto) {
+  const indice = process.argv.indexOf(`--${nombre}`);
+  return indice !== -1 && process.argv[indice + 1]
+    ? path.resolve(process.argv[indice + 1])
+    : porDefecto;
+}
+
+const DATA_DIR = opcion('data', path.join(ROOT, 'data'));
+const DIST_DIR = opcion('out', path.join(ROOT, 'dist'));
+
+// Manifiesto para generar_imagenes.py. Va fuera de dist/ a propósito —es un
+// artefacto intermedio, no algo que deba publicarse— y colgando del mismo sitio
+// que la salida, para que compilar con --out a un temporal no pise el
+// manifiesto bueno del repo.
+const BUILD_DIR = path.join(path.dirname(DIST_DIR), 'build');
 
 const TEMA_POR_DEFECTO = 'v2';
 
@@ -57,34 +87,59 @@ const ICONOS_CONTACTO = {
 // que cada profesional aporte su ficha (por PR o por un formulario). Desde ese
 // momento data/ es entrada no confiable, y estos valores terminan dentro de
 // atributos href, de un bloque <style> y de rutas de archivos que se copian a
-// dist/ —que es justo lo que se publica—. Cada uno se valida contra lo que
-// realmente puede ser; lo que no pasa, se descarta con un aviso en consola.
-
-// Escapar no sirve dentro de <style>: el navegador no decodifica entidades ahí,
-// y un ";" o un "}" cerrarían la declaración y dejarían inyectar reglas nuevas
-// (por ejemplo un url() a un servidor externo). Por eso los colores y la
-// tipografía se validan por forma, no se escapan.
-const RE_COLOR = /^#[0-9a-f]{3,8}$/i;
-const RE_TIPOGRAFIA = /^[\w][\w \-]{0,63}$/;
-
-// Nombres de archivo de marcas.json: se concatenan con path.join, que resuelve
-// "..", y el resultado se copia a dist/. Un nombre como "../../.git/config"
-// publicaría un archivo arbitrario del repo. Solo se acepta un nombre plano.
-const RE_NOMBRE_ARCHIVO = /^[\w][\w.\-]{0,127}$/;
-
-// Esquemas admitidos en un href. Sin esta lista, un "javascript:..." en
-// sitio_web o linkedin queda como enlace ejecutable en la tarjeta publicada.
-const ESQUEMAS_PERMITIDOS = new Set(['https:', 'http:', 'mailto:', 'tel:']);
+// dist/ —que es justo lo que se publica—.
+//
+// El reparto es: scripts/validar.mjs rechaza de plano lo que decide identidad y
+// rutas (slug, id de marca, marca_id, nombres de archivo) y el build ni
+// arranca; lo de acá abajo sanea los campos de contenido, que solo avisan y
+// caen al valor por defecto —un color mal escrito en una marca no debería
+// dejar a las demás personas sin publicar—.
+//
+// Las expresiones regulares se importan de validar.mjs y no se redefinen acá:
+// dos definiciones de "qué es un color válido" terminan separándose, y cuando
+// se separan aparece justo el hueco por el que se cuela algo.
 
 function avisar(contexto, mensaje) {
   console.warn(`⚠ ${contexto}: ${mensaje}`);
 }
 
+// Los colores tienen dos consumidores con criterios distintos: el CSS, que
+// entiende #rgb, #rgba, #rrggbb y #rrggbbaa, y generar_imagenes.py, que solo
+// entiende #rrggbb. Un "#fff" —válido en todas partes— hacía reventar el
+// generador de imágenes a mitad de la corrida. Se normaliza a la forma larga
+// una sola vez, acá, y ambos reciben lo mismo.
+function normalizarColor(texto) {
+  const hex = texto.slice(1);
+  const largo = hex.length <= 4 ? [...hex].map((c) => c + c).join('') : hex;
+  return `#${largo.toUpperCase()}`;
+}
+
+// Para el PNG, que compone sobre un fondo opaco y no sabe qué hacer con el alfa.
+function sinAlfa(color, contexto) {
+  if (color.length <= 7) return color;
+  avisar(contexto, `${color} lleva canal alfa; la imagen para WhatsApp usará ${color.slice(0, 7)}.`);
+  return color.slice(0, 7);
+}
+
 function colorSeguro(valor, porDefecto, contexto) {
   if (valor === undefined || valor === null || valor === '') return porDefecto;
-  if (RE_COLOR.test(String(valor).trim())) return String(valor).trim();
+  const texto = String(valor).trim();
+  if (RE_COLOR.test(texto)) return normalizarColor(texto);
   avisar(contexto, `color inválido ${JSON.stringify(valor)}, se usa ${porDefecto}.`);
   return porDefecto;
+}
+
+// Cinturón y tirantes sobre validarDatos(): todo lo que se concatene a una ruta
+// de disco pasa por acá. Si algún día se llama al build saltándose la
+// validación, que reviente antes de escribir y no después, en la carpeta
+// equivocada.
+function segmentoSeguro(valor, contexto) {
+  if (typeof valor !== 'string' || !RE_SLUG.test(valor)) {
+    throw new Error(
+      `${contexto}: ${JSON.stringify(valor)} no sirve como nombre de carpeta (esperado: minúsculas, dígitos y guiones).`
+    );
+  }
+  return valor;
 }
 
 function tipografiaSegura(valor, porDefecto, contexto) {
@@ -133,7 +188,7 @@ function urlSegura(valor, contexto) {
 function usuarioSeguro(valor, contexto) {
   const texto = String(valor ?? '').trim().replace(/^@/, '');
   if (!texto) return '';
-  if (/^[\w.\-]{1,64}$/.test(texto)) return texto;
+  if (RE_USUARIO.test(texto)) return texto;
   avisar(contexto, `usuario inválido ${JSON.stringify(texto)}, se ignora.`);
   return '';
 }
@@ -149,7 +204,7 @@ function telefonoSeguro(valor, contexto) {
 function correoSeguro(valor, contexto) {
   const texto = String(valor ?? '').trim();
   if (!texto) return '';
-  if (/^[^\s@,;:<>"'()[\]\\]+@[^\s@,;:<>"'()[\]\\]+\.[a-z]{2,}$/i.test(texto)) return texto;
+  if (RE_CORREO.test(texto)) return texto;
   avisar(contexto, `correo inválido ${JSON.stringify(texto)}, se ignora.`);
   return '';
 }
@@ -185,9 +240,13 @@ function escapeVCard(valor) {
     .replace(/\r\n?|\n/g, '\\n');
 }
 
+// Object.hasOwn y no "in": con "in", un {{constructor}} o un {{toString}} en la
+// plantilla resolvían contra Object.prototype y escupían "function Object() {
+// [native code] }" dentro del HTML. Hoy las plantillas son del repo y da igual,
+// pero dejan de serlo en cuanto una marca aporte su propio tema.
 function render(plantilla, valores) {
   return plantilla.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (coincidencia, clave) =>
-    clave in valores ? valores[clave] : ''
+    Object.hasOwn(valores, clave) ? valores[clave] : ''
   );
 }
 
@@ -488,18 +547,44 @@ function listarTemas() {
     .sort();
 }
 
-const marcas = JSON.parse(readFileSync(path.join(DATA_DIR, 'marcas.json'), 'utf8'));
-const personas = JSON.parse(readFileSync(path.join(DATA_DIR, 'personas.json'), 'utf8'));
-const config = JSON.parse(readFileSync(path.join(DATA_DIR, 'config.json'), 'utf8'));
-const marcasPorId = Object.fromEntries(marcas.map((m) => [m.id, sanearMarca(m)]));
+function leerJson(nombre) {
+  const ruta = path.join(DATA_DIR, nombre);
+  try {
+    return JSON.parse(readFileSync(ruta, 'utf8'));
+  } catch (error) {
+    console.error(`✗ data/${nombre}: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+const marcas = leerJson('marcas.json');
+const personas = leerJson('personas.json');
+const config = leerJson('config.json');
 
 const temas = listarTemas();
+
+// Puerta de entrada: si data/ no está en condiciones, el build no publica nada.
+// Antes seguía adelante y el resultado era, según el caso, un stack de Node sin
+// contexto o —peor— una tarjeta publicada con el nombre en blanco.
+const validacion = validarDatos({ marcas, personas, config, temas });
+for (const linea of formatear(validacion)) console.log(linea);
+if (validacion.errores.length) {
+  console.error(
+    `\n✗ ${validacion.errores.length} error(es) en data/: no se generó nada.\n` +
+      '  Corrige lo de arriba y vuelve a correr. Detalle del esquema: scripts/validar.mjs'
+  );
+  process.exit(1);
+}
+
+const marcasPorId = Object.fromEntries(marcas.map((m) => [m.id, sanearMarca(m)]));
+
 const temaActivo = temas.includes(config.tema) ? config.tema : TEMA_POR_DEFECTO;
 if (config.tema && config.tema !== temaActivo) {
   console.warn(`⚠ config.tema "${config.tema}" no existe en templates/, se usa "${temaActivo}".`);
 }
 
 const resumen = [];
+const manifiesto = [];
 
 for (const personaCruda of personas) {
   const persona = sanearPersona(personaCruda);
@@ -516,29 +601,53 @@ for (const personaCruda of personas) {
     continue;
   }
 
-  const baseDir = path.join(DIST_DIR, persona.slug);
+  // slug y marca_id deciden en qué carpeta se escribe y de cuál se copia. Van
+  // por segmentoSeguro() antes de tocar path.join: sin eso, un "../.." en la
+  // ficha escribía fuera de dist/ y copiaba a la web imágenes de cualquier
+  // parte del disco de quien compila.
+  const slug = segmentoSeguro(persona.slug, 'slug');
+  const baseDir = path.join(DIST_DIR, slug);
 
   // El logo real vive junto a la marca compartida, o en los assets propios
   // de la persona cuando trae su propia marca embebida (profesional independiente).
   const logoDir = persona.marca_id
-    ? path.join(ASSETS_DIR, 'marcas', persona.marca_id)
-    : path.join(ASSETS_DIR, 'personas', persona.slug);
-  const ctxArchivos = `${persona.slug} → assets de marca`;
+    ? path.join(ASSETS_DIR, 'marcas', segmentoSeguro(persona.marca_id, `${slug} → marca_id`))
+    : path.join(ASSETS_DIR, 'personas', slug);
+  const ctxArchivos = `${slug} → assets de marca`;
   const logoFile = pickLogoFile(logoDir, marca.logo, `${ctxArchivos} (logo)`);
   // Versión clara del logo, para el bloque carbón de la cabecera (tema v2).
   const logoClaroFile = archivoSeguro(logoDir, marca.logo_claro, `${ctxArchivos} (logo_claro)`);
   // Plano de fondo (lo genera scripts/generar_planos.py) que cubre el cuerpo de
   // la tarjeta a muy baja opacidad.
   const fondoPlanoFile = archivoSeguro(logoDir, marca.fondo_plano, `${ctxArchivos} (fondo_plano)`);
+  // Estos dos no los usa la tarjeta web, solo la imagen para WhatsApp: el
+  // emblema va dentro del QR y el plano en PNG de fondo. Se resuelven acá igual
+  // porque generar_imagenes.py ya no lee data/ por su cuenta.
+  const emblemaFile = archivoSeguro(logoDir, marca.logo_emblema, `${ctxArchivos} (logo_emblema)`);
+  const fondoPlanoPngFile = archivoSeguro(logoDir, marca.fondo_plano_png, `${ctxArchivos} (fondo_plano_png)`);
 
   const nombrePartido = partirNombre(persona);
-  const ctxColores = `${persona.slug} → color`;
+  const ctxColores = `${slug} → color`;
+
+  // La paleta se resuelve una sola vez y la usan los dos destinos: el <style>
+  // de la plantilla y el manifiesto del que sale la imagen para WhatsApp. Antes
+  // cada uno la interpretaba por su cuenta y no coincidían.
+  const paletaResuelta = {
+    oscuro: colorSeguro(marca.colores?.oscuro, '#4D4D4D', `${ctxColores} oscuro`),
+    claro: colorSeguro(marca.colores?.claro, '#B3B3B3', `${ctxColores} claro`),
+    fondo: colorSeguro(marca.colores?.fondo, '#FFFFFF', `${ctxColores} fondo`),
+    carbon: colorSeguro(marca.colores_secundarios?.carbon, '#24292D', `${ctxColores} carbon`),
+    olivo: colorSeguro(marca.colores_secundarios?.olivo, '#83855B', `${ctxColores} olivo`),
+    olivo_texto: colorSeguro(marca.colores_secundarios?.olivo_texto, '#6B6C47', `${ctxColores} olivo_texto`),
+    olivo_claro: colorSeguro(marca.colores_secundarios?.olivo_claro, '#A8AA7C', `${ctxColores} olivo_claro`),
+    crema: colorSeguro(marca.colores_secundarios?.crema, '#F4F1EC', `${ctxColores} crema`),
+  };
 
   const camposEscapables = {
     nombre: persona.nombre,
     cargo: persona.cargo,
     profesion: persona.profesion,
-    slug: persona.slug,
+    slug,
     'persona.nombre_pila': nombrePartido.pila,
     'persona.apellidos': nombrePartido.apellidos,
     'persona.telefono_display': persona.telefono_display,
@@ -554,14 +663,14 @@ for (const personaCruda of personas) {
     'marca.instagram': persona.instagram || marca.instagram || '',
     // Estos van dentro del <style> de la plantilla, donde escapar no protege:
     // se validan por forma y, si no pasan, cae el valor por defecto.
-    'marca.color_oscuro': colorSeguro(marca.colores?.oscuro, '#4D4D4D', `${ctxColores} oscuro`),
-    'marca.color_claro': colorSeguro(marca.colores?.claro, '#B3B3B3', `${ctxColores} claro`),
-    'marca.color_fondo': colorSeguro(marca.colores?.fondo, '#FFFFFF', `${ctxColores} fondo`),
-    'marca.color_carbon': colorSeguro(marca.colores_secundarios?.carbon, '#24292D', `${ctxColores} carbon`),
-    'marca.color_olivo': colorSeguro(marca.colores_secundarios?.olivo, '#83855B', `${ctxColores} olivo`),
-    'marca.color_olivo_texto': colorSeguro(marca.colores_secundarios?.olivo_texto, '#6B6C47', `${ctxColores} olivo_texto`),
-    'marca.color_olivo_claro': colorSeguro(marca.colores_secundarios?.olivo_claro, '#A8AA7C', `${ctxColores} olivo_claro`),
-    'marca.color_crema': colorSeguro(marca.colores_secundarios?.crema, '#F4F1EC', `${ctxColores} crema`),
+    'marca.color_oscuro': paletaResuelta.oscuro,
+    'marca.color_claro': paletaResuelta.claro,
+    'marca.color_fondo': paletaResuelta.fondo,
+    'marca.color_carbon': paletaResuelta.carbon,
+    'marca.color_olivo': paletaResuelta.olivo,
+    'marca.color_olivo_texto': paletaResuelta.olivo_texto,
+    'marca.color_olivo_claro': paletaResuelta.olivo_claro,
+    'marca.color_crema': paletaResuelta.crema,
     'marca.tipografia': tipografiaSegura(marca.tipografia, 'Montserrat', `${ctxColores} tipografia`),
   };
   const valoresBase = Object.fromEntries(
@@ -639,17 +748,73 @@ for (const personaCruda of personas) {
   }
 
   resumen.push({
-    slug: persona.slug,
+    slug,
     nombre: persona.nombre,
     marca: marca.nombre,
     logo: logoFile,
     archivos: archivosGenerados,
   });
+
+  // Ficha ya validada y normalizada para generar_imagenes.py. Antes ese script
+  // releía data/*.json por su cuenta, así que nada de lo que se valida acá le
+  // aplicaba: los colores le llegaban crudos y, sobre todo, un campo
+  // "url_publica" en la ficha decidía qué URL se grababa en el QR impreso.
+  // Ahora la URL la calcula el build a partir de base_url + slug y no hay forma
+  // de que la ficha la controle.
+  manifiesto.push({
+    slug,
+    url_publica: `${String(config.base_url).replace(/\/+$/, '')}/${slug}/`,
+    persona: {
+      nombre: persona.nombre,
+      nombre_pila: nombrePartido.pila,
+      apellidos: nombrePartido.apellidos,
+      cargo: persona.cargo ?? '',
+      profesion: persona.profesion ?? '',
+      email: persona.email,
+      telefono_display: persona.telefono_display ?? '',
+      instagram: persona.instagram,
+      linkedin: persona.linkedin,
+      linkedin_display: persona.linkedin_display ?? persona.nombre,
+    },
+    marca: {
+      nombre: marca.nombre,
+      tagline: marca.tagline ?? null,
+      email: marca.email,
+      telefono_display: marca.telefono_display ?? '',
+      instagram: marca.instagram,
+      linkedin: marca.linkedin,
+      sitio_web: marca.sitio_web,
+      direccion: marca.direccion ?? null,
+    },
+    // Sin alfa: el PNG compone sobre fondo opaco.
+    colores: Object.fromEntries(
+      Object.entries(paletaResuelta).map(([clave, color]) => [
+        clave,
+        sinAlfa(color, `${slug} → color ${clave}`),
+      ])
+    ),
+    // Rutas relativas a la raíz del repo, ya comprobadas contra la carpeta de la
+    // marca. El PNG usa el emblema y el plano en PNG, que la web no copia a dist/.
+    assets: {
+      dir: path.relative(ROOT, logoDir),
+      logo: logoFile,
+      logo_claro: logoClaroFile,
+      logo_emblema: emblemaFile,
+      fondo_plano_png: fondoPlanoPngFile,
+    },
+  });
 }
 
 // La raíz del sitio publicado no es una tarjeta: con una sola persona redirige a
 // ella, y con varias lista las disponibles. Sin esto, entrar a la raíz da 404.
-const destinoRaiz = resumen.length === 1 ? `./${resumen[0].slug}/` : null;
+//
+// Este archivo lo arma el build a mano, fuera de las plantillas, y por eso se le
+// habían pasado dos cosas: el slug se interpolaba crudo en el href (un slug con
+// comillas y una etiqueta <script> quedaba como script ejecutable en el origen
+// de Pages, que es compartido con los demás sitios de la cuenta) y el nombre no
+// se escapaba en la rama del redirect. Ahora todo lo interpolado pasa por
+// escapeHtml, aunque el esquema ya no deje pasar un slug así.
+const destinoRaiz = resumen.length === 1 ? escapeHtml(`./${resumen[0].slug}/`) : null;
 writeFileSync(
   path.join(DIST_DIR, 'index.html'),
   destinoRaiz
@@ -657,18 +822,25 @@ writeFileSync(
 <html lang="es">
 <meta charset="utf-8">
 <title>Tarjetas de presentación</title>
+<meta name="robots" content="noindex, nofollow">
 <meta http-equiv="refresh" content="0; url=${destinoRaiz}">
 <link rel="canonical" href="${destinoRaiz}">
-<p>Redirigiendo a <a href="${destinoRaiz}">${resumen[0].nombre}</a>…</p>
+<p>Redirigiendo a <a href="${destinoRaiz}">${escapeHtml(resumen[0].nombre)}</a>…</p>
 </html>
 `
     : `<!doctype html>
 <html lang="es">
 <meta charset="utf-8">
 <title>Tarjetas de presentación</title>
+<meta name="robots" content="noindex, nofollow">
 <h1>Tarjetas de presentación</h1>
 <ul>
-${resumen.map((item) => `  <li><a href="./${item.slug}/">${escapeHtml(item.nombre)} — ${escapeHtml(item.marca)}</a></li>`).join('\n')}
+${resumen
+  .map(
+    (item) =>
+      `  <li><a href="${escapeHtml(`./${item.slug}/`)}">${escapeHtml(item.nombre)} — ${escapeHtml(item.marca)}</a></li>`
+  )
+  .join('\n')}
 </ul>
 </html>
 `
@@ -685,6 +857,15 @@ writeFileSync(path.join(DIST_DIR, '.nojekyll'), '');
 writeFileSync(
   path.join(DIST_DIR, 'robots.txt'),
   ['User-agent: *', 'Disallow: /', ''].join('\n')
+);
+
+// Manifiesto: la única entrada de generar_imagenes.py. Que ese script no vuelva
+// a leer data/ es lo que garantiza que no exista un segundo consumidor de datos
+// crudos al que haya que recordarle aplicar las mismas validaciones.
+mkdirSync(BUILD_DIR, { recursive: true });
+writeFileSync(
+  path.join(BUILD_DIR, 'manifiesto.json'),
+  JSON.stringify({ version: 1, dist: path.relative(ROOT, DIST_DIR), personas: manifiesto }, null, 2) + '\n'
 );
 
 console.log('\nResumen de generación:\n');

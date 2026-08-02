@@ -2,6 +2,10 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Manifiesto intermedio entre build.mjs y generar_imagenes.py. Se regenera en
+# cada build y no se publica: lo que se publica es dist/.
+build/
+
 # Ajustes locales de Claude Code: son de la máquina de cada quien (rutas,
 # permisos concedidos), no del proyecto.
 .claude/settings.local.json

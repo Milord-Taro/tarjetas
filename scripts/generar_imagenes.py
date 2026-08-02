@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""Genera QR + imagen para WhatsApp para cada persona, a partir de dist/{slug}/
-   (que ya debe existir — correr primero `node scripts/build.mjs`).
+"""Genera QR + imagen para WhatsApp para cada persona, a partir de
+   build/manifiesto.json (que produce `node scripts/build.mjs`, hay que correrlo
+   antes).
+
+   Este script NO lee data/*.json. Lo hacía, y era un agujero: toda la
+   validación del proyecto vive en build.mjs, así que un dato que la web
+   rechazaba llegaba acá intacto. En concreto, un campo "url_publica" en la
+   ficha decidía qué URL quedaba grabada en el QR —el QR es lo que se imprime y
+   lo que nadie revisa a ojo—. Ahora la única entrada es el manifiesto, que ya
+   viene validado y normalizado, y la URL la calcula el build.
 
    La imagen sigue el mismo arte del tema v2: cuña olivo con corte diagonal y,
    encima, bloque carbón cortado en chevron; cuerpo en crema con la jerarquía
@@ -8,14 +16,14 @@
 
 import json
 import math
+import sys
 from pathlib import Path
 
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
-DIST_DIR = ROOT / "dist"
+MANIFIESTO = ROOT / "build" / "manifiesto.json"
 
 # Paleta por defecto (TOPP CREATE); marcas.json la sobreescribe por marca.
 COLORES = {
@@ -82,8 +90,19 @@ PESOS = {"light": 300, "regular": 400, "medium": 500, "semibold": 600, "bold": 7
 
 
 def hex_a_rgb(color_hex):
-    color_hex = str(color_hex).lstrip("#")
-    return tuple(int(color_hex[i : i + 2], 16) for i in (0, 2, 4))
+    """#rrggbb → (r, g, b).
+
+    El manifiesto ya normaliza todo a seis dígitos, pero esto acepta también la
+    forma corta y descarta el alfa en vez de reventar: antes un "#fff"
+    —perfectamente válido en CSS y aceptado por el build— lanzaba un ValueError
+    a mitad de la corrida y las personas que venían después se quedaban sin QR.
+    """
+    texto = str(color_hex).lstrip("#")
+    if len(texto) in (3, 4):
+        texto = "".join(c * 2 for c in texto)
+    if len(texto) < 6:
+        raise ValueError(f"color hex no reconocido: {color_hex!r}")
+    return tuple(int(texto[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def buscar_fuente(patrones, directorios):
@@ -668,81 +687,88 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     img.convert("RGB").save(salida)
 
 
-def resolver_marca(persona, marcas_por_id):
-    if persona.get("marca_id"):
-        return marcas_por_id.get(persona["marca_id"])
-    return persona.get("marca")
-
-
-def paleta_de(marca):
+def paleta_de(ficha):
+    """Paleta del manifiesto, ya validada y sin canal alfa, sobre la de por defecto."""
     valores = dict(COLORES)
-    valores.update({k: v for k, v in (marca.get("colores") or {}).items() if v})
-    valores.update({k: v for k, v in (marca.get("colores_secundarios") or {}).items() if v})
+    valores.update({k: v for k, v in (ficha.get("colores") or {}).items() if v})
     return {clave: hex_a_rgb(valor) for clave, valor in valores.items()}
 
 
-def url_publica_de(persona, base_url):
-    if persona.get("url_publica"):
-        return persona["url_publica"]
-    return f"{base_url.rstrip('/')}/{persona['slug']}/"
+def resolver_asset(assets, dist_assets, clave):
+    """Ubica un asset declarado en el manifiesto.
+
+    Los nombres ya los comprobó build.mjs contra la carpeta de la marca, pero
+    esta función vuelve a exigir que la ruta resuelta cuelgue de la raíz del
+    repo: es la última barrera antes de abrir un archivo del disco y meterlo en
+    una pieza que se publica.
+    """
+    nombre = assets.get(clave)
+    if not nombre:
+        return None
+    for carpeta in (dist_assets, ROOT / assets["dir"]):
+        ruta = (carpeta / nombre).resolve()
+        if not ruta.is_relative_to(ROOT):
+            print(f"⚠ {clave}: {ruta} queda fuera del repo, se ignora.")
+            return None
+        if ruta.exists():
+            return ruta
+    return None
 
 
 def main():
-    marcas = json.loads((DATA_DIR / "marcas.json").read_text(encoding="utf-8"))
-    personas = json.loads((DATA_DIR / "personas.json").read_text(encoding="utf-8"))
-    config = json.loads((DATA_DIR / "config.json").read_text(encoding="utf-8"))
-    marcas_por_id = {m["id"]: m for m in marcas}
-    base_url = config.get("base_url", "")
+    if not MANIFIESTO.exists():
+        print(
+            f"✗ falta {MANIFIESTO.relative_to(ROOT)}.\n"
+            "  Corre antes: node scripts/build.mjs"
+        )
+        return 1
 
-    for persona in personas:
-        marca = resolver_marca(persona, marcas_por_id)
-        if not marca:
-            print(f"⚠ {persona['slug']}: sin marca resuelta, se omite.")
-            continue
+    manifiesto = json.loads(MANIFIESTO.read_text(encoding="utf-8"))
+    if manifiesto.get("version") != 1:
+        print(f"✗ manifiesto en versión {manifiesto.get('version')!r}; este script espera la 1.")
+        return 1
 
-        out_dir = DIST_DIR / persona["slug"]
+    dist_dir = ROOT / manifiesto["dist"]
+
+    for ficha in manifiesto["personas"]:
+        slug = ficha["slug"]
+        out_dir = dist_dir / slug
         if not out_dir.exists():
-            print(f"⚠ {persona['slug']}: no existe dist/{persona['slug']}/ — corre antes node scripts/build.mjs.")
+            print(f"⚠ {slug}: no existe {out_dir.relative_to(ROOT)}/ — corre antes node scripts/build.mjs.")
             continue
 
-        paleta = paleta_de(marca)
+        persona, marca = ficha["persona"], ficha["marca"]
+        paleta = paleta_de(ficha)
 
-        # El logo claro (sobre el bloque carbón) y el emblema (dentro del QR) los
-        # copia build.mjs a dist/{slug}/assets/, junto a la marca correspondiente.
-        assets_dir = out_dir / "assets"
-        marca_dir = ROOT / "assets" / "marcas" / marca.get("id", "")
-        def resolver_asset(nombre):
-            for carpeta in (assets_dir, marca_dir):
-                if nombre and (carpeta / nombre).exists():
-                    return carpeta / nombre
-            return None
-
-        logo_claro = resolver_asset(marca.get("logo_claro")) or resolver_asset(marca.get("logo"))
-        emblema = resolver_asset(marca.get("logo_emblema"))
+        # El logo claro (sobre el bloque carbón) va en dist/{slug}/assets/ porque
+        # la web también lo usa; el emblema (dentro del QR) y el plano en PNG
+        # solo los usa esta imagen, así que se leen de la carpeta de la marca.
+        assets, dist_assets = ficha["assets"], out_dir / "assets"
+        logo_claro = resolver_asset(assets, dist_assets, "logo_claro") or resolver_asset(
+            assets, dist_assets, "logo"
+        )
+        emblema = resolver_asset(assets, dist_assets, "logo_emblema")
         # La web usa el SVG y esta imagen el PNG: PIL no rasteriza SVG.
-        plano = resolver_asset(marca.get("fondo_plano_png"))
+        plano = resolver_asset(assets, dist_assets, "fondo_plano_png")
 
-        url = url_publica_de(persona, base_url)
+        # La URL la calculó el build a partir de base_url + slug. La ficha no
+        # puede influir en ella: es lo que se graba en el QR impreso.
+        url = ficha["url_publica"]
 
         # Sin emblema al centro: es el QR que se imprime y el que más se escanea,
         # y el logo tapa módulos. El de la vCard sí lo lleva (ver más abajo).
-        qr_path = out_dir / "qr.png"
-        generar_qr(url, paleta["carbon"], paleta["fondo"], None, 600).save(qr_path)
+        generar_qr(url, paleta["carbon"], paleta["fondo"], None, 600).save(out_dir / "qr.png")
 
-        whatsapp_path = out_dir / "tarjeta-whatsapp.png"
         generar_tarjeta_whatsapp(
-            persona, marca, paleta, logo_claro, emblema, plano, url, whatsapp_path
+            persona, marca, paleta, logo_claro, emblema, plano, url,
+            out_dir / "tarjeta-whatsapp.png",
         )
 
-        print(f"• {persona['slug']}: dist/{persona['slug']}/qr.png -> {url}")
-        print(f"           dist/{persona['slug']}/tarjeta-whatsapp.png")
+        print(f"• {slug}: dist/{slug}/qr.png -> {url}")
+        print(f"           dist/{slug}/tarjeta-whatsapp.png")
 
-    if base_url == "https://tarjetas.toppcreate.com":
-        print(
-            "\n⚠ data/config.json usa un base_url de ejemplo. "
-            "Actualízalo con la URL real de GitHub Pages antes de compartir los QR."
-        )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

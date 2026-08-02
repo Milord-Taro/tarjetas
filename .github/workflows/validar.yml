@@ -1,0 +1,59 @@
+# Revisión automática de las fichas que llegan por PR.
+#
+# La idea es que quien revise el PR mire el CONTENIDO —si esos datos son de esa
+# persona y si hay consentimiento— y no la sintaxis. De la sintaxis, de las
+# rutas y de los campos no previstos se encarga esto.
+#
+# Es `pull_request` y NO `pull_request_target`: pull_request_target corre con el
+# token del repo base y con permisos de escritura sobre un checkout de código
+# que nadie ha revisado todavía. Un PR desde un fork podría entonces modificar
+# el propio workflow o los scripts y ejecutarlos con credenciales del repo. Aquí
+# no hace falta: no se despliega nada y no se usa ningún secreto.
+name: Validar fichas
+
+on:
+  pull_request:
+    branches: [main]
+
+# Solo lectura, y sin acceso a secretos. Este workflow no publica.
+permissions:
+  contents: read
+
+concurrency:
+  group: validar-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          # Hace falta el historial para comparar la base con la punta del PR
+          # en el último paso. El repo es pequeño y el clon completo no duele.
+          fetch-depth: 0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: '22'
+
+      - name: Esquema de data/
+        run: node scripts/validar.mjs
+
+      - name: Tests
+        run: node --test test/*.test.mjs
+
+      - name: El build no escribe fuera de su directorio
+        run: node scripts/build.mjs --out "$RUNNER_TEMP/pr/dist"
+
+      # Un PR que solo aporta una ficha no tiene por qué traer dist/ recompilado
+      # —eso lo hace quien publica, en local, junto con los QR—. Pero conviene
+      # que se vea en la revisión.
+      - name: Avisar si el PR toca dist/
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE" "$HEAD" | grep -q '^dist/'; then
+            echo "::warning::Este PR modifica dist/. Revisa que la salida corresponda a data/ antes de mezclar."
+          fi

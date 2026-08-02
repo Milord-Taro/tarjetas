@@ -1,12 +1,15 @@
 # Publica dist/ tal cual está commiteado. El build no corre aquí a propósito:
 # generar_imagenes.py depende de Pillow y de las fuentes locales, y el QR debe
 # revisarse a ojo antes de imprimirse, así que se genera en local y se versiona.
+#
+# Lo que sí corre aquí es la comprobación de que ese dist/ commiteado
+# corresponde de verdad al data/ commiteado, que antes se sostenía solo en la
+# disciplina de quien publicaba.
 name: Publicar en GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: ['dist/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -20,15 +23,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Antes había un filtro `paths: ['dist/**', ...]` en el trigger. Ahorraba
+  # despliegues que no cambiaban nada, y a cambio abría una avería silenciosa:
+  # un force push no disparó el workflow y el sitio siguió sirviendo datos
+  # viejos durante horas, sin ninguna señal. Pages sigue publicando el último
+  # despliegue exitoso, así que "no corrió" y "corrió y no cambió nada" se ven
+  # igual desde fuera. El force push es además la maniobra con la que se purgan
+  # datos personales del historial: es justo el momento en el que no se puede
+  # depender de que el filtro acierte. Veinte segundos de job cuestan menos.
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      # Las acciones van ancladas al SHA del commit y no al tag: un tag se puede
+      # mover, así que "@v4" no garantiza que mañana corra el mismo código con el
+      # que se revisó este workflow. El comentario deja a la vista qué versión es
+      # cada SHA; para actualizar, se mueve el par SHA + comentario a la vez.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: '22'
+
+      - name: Validar data/
+        run: node scripts/validar.mjs
+
+      - name: Tests
+        run: node --test test/*.test.mjs
+
+      - name: dist/ corresponde a data/
+        # Se recompila a un temporal y se compara con lo commiteado. Se excluyen
+        # qr.png y tarjeta-whatsapp.png porque los genera generar_imagenes.py,
+        # que necesita Pillow y no corre aquí.
+        run: |
+          node scripts/build.mjs --out "$RUNNER_TEMP/verificacion/dist"
+          if ! diff -r -q dist "$RUNNER_TEMP/verificacion/dist" \
+               -x qr.png -x tarjeta-whatsapp.png -x .gitkeep; then
+            echo "::error::El dist/ commiteado no corresponde al data/ commiteado."
+            echo "Corre en local: node scripts/build.mjs && python3 scripts/generar_imagenes.py"
+            exit 1
+          fi
+
   deploy:
+    needs: verificar
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    # Las acciones van ancladas al SHA del commit y no al tag: un tag se puede
-    # mover, así que "@v4" no garantiza que mañana corra el mismo código con el
-    # que se revisó este workflow. El comentario deja a la vista qué versión es
-    # cada SHA; para actualizar, se mueve el par SHA + comentario a la vez.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
