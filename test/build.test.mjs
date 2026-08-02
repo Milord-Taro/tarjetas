@@ -53,6 +53,17 @@ function compilar(personas, { marcas = MARCAS, config = CONFIG } = {}) {
   return { estado, salida, dist: distDir, raiz };
 }
 
+// Vuelve a compilar sobre un temporal que ya existe, para probar qué hace el
+// build con lo que quedó de la vez anterior.
+function recompilar(raiz, extra = []) {
+  const args = [BUILD, '--data', path.join(raiz, 'data'), '--out', path.join(raiz, 'dist'), ...extra];
+  try {
+    return { estado: 0, salida: execFileSync('node', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) };
+  } catch (error) {
+    return { estado: error.status ?? 1, salida: `${error.stdout ?? ''}${error.stderr ?? ''}` };
+  }
+}
+
 // El manifiesto se escribe junto a la salida, así que cada compilación de test
 // tiene el suyo y no toca el del repo.
 const leerManifiesto = (raiz) =>
@@ -144,6 +155,52 @@ test('la URL del QR la calcula el build, no la ficha', () => {
   assert.equal(estado, 0);
   const manifiesto = leerManifiesto(raiz);
   assert.equal(manifiesto.personas[0].url_publica, 'https://ejemplo.test/tarjetas/ana-perez/');
+});
+
+test('poda los archivos que sobran dentro de una tarjeta activa', () => {
+  const { dist, raiz } = compilar([ficha({})]);
+
+  // Un asset de una configuración anterior, como los que quedaron colgando en
+  // el sitio publicado sin que nada los referenciara.
+  const huerfano = path.join(dist, 'ana-perez', 'assets', 'logo-de-antes.png');
+  writeFileSync(huerfano, 'sobra');
+  recompilar(raiz);
+
+  assert.ok(!existsSync(huerfano), 'el asset huérfano debería desaparecer del sitio');
+  assert.ok(existsSync(path.join(dist, 'ana-perez', 'index.html')), 'lo bueno se queda');
+});
+
+test('no borra lo que genera generar_imagenes.py', () => {
+  const { dist, raiz } = compilar([ficha({})]);
+  for (const nombre of ['qr.png', 'tarjeta-whatsapp.png']) {
+    writeFileSync(path.join(dist, 'ana-perez', nombre), 'png falso');
+  }
+  recompilar(raiz);
+
+  for (const nombre of ['qr.png', 'tarjeta-whatsapp.png']) {
+    assert.ok(existsSync(path.join(dist, 'ana-perez', nombre)), `${nombre} no debería borrarse`);
+  }
+});
+
+test('quitar a alguien de data/ no lo despublica en silencio', () => {
+  const { dist, raiz } = compilar([ficha({})]);
+  assert.ok(existsSync(path.join(dist, 'ana-perez', 'index.html')));
+
+  // Retiro: la ficha desaparece de personas.json.
+  writeFileSync(path.join(raiz, 'data', 'personas.json'), '[]');
+  const sinBandera = recompilar(raiz);
+
+  assert.equal(sinBandera.estado, 1, 'debería plantarse en vez de decidir solo');
+  assert.match(sinBandera.salida, /--retirar/);
+  assert.ok(
+    existsSync(path.join(dist, 'ana-perez', 'index.html')),
+    'sin la bandera no debe borrar nada'
+  );
+
+  const conBandera = recompilar(raiz, ['--retirar']);
+  assert.equal(conBandera.estado, 0);
+  assert.ok(!existsSync(path.join(dist, 'ana-perez')), 'con la bandera sí se despublica');
+  assert.deepEqual(readdirSync(dist).sort(), ['.nojekyll', 'index.html', 'robots.txt']);
 });
 
 test('data/ del repo compila sin errores ni avisos', () => {

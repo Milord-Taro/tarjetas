@@ -3,7 +3,9 @@
 // Temas: cada subcarpeta de templates/ es un tema (card.html + style.css). El tema
 // activo (data/config.json → "tema") se publica en dist/{slug}/ y los demás quedan
 // en dist/{slug}/{tema}/ para poder comparar versiones sin volver a compilar.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, statSync, rmSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -37,6 +39,18 @@ function opcion(nombre, porDefecto) {
 
 const DATA_DIR = opcion('data', path.join(ROOT, 'data'));
 const DIST_DIR = opcion('out', path.join(ROOT, 'dist'));
+
+// --retirar autoriza a borrar de dist/ la carpeta de alguien que ya no está en
+// personas.json. Sin la bandera el build se planta y explica qué hacer: quitar
+// a una persona no es lo mismo que corregirle un dato, y no debería pasar por
+// descuido (ver "Retirar a una persona" en el README).
+const RETIRAR = process.argv.includes('--retirar');
+
+// Archivos dentro de dist/{slug}/ que este script no genera pero tampoco debe
+// borrar: los produce generar_imagenes.py, que corre después.
+const AJENOS = new Set(['qr.png', 'tarjeta-whatsapp.png']);
+// Marcador para que dist/ exista en git aunque esté vacío.
+const AJENOS_RAIZ = new Set(['.gitkeep']);
 
 // Manifiesto para generar_imagenes.py. Va fuera de dist/ a propósito —es un
 // artefacto intermedio, no algo que deba publicarse— y colgando del mismo sitio
@@ -101,6 +115,92 @@ const ICONOS_CONTACTO = {
 
 function avisar(contexto, mensaje) {
   console.warn(`⚠ ${contexto}: ${mensaje}`);
+}
+
+// ── Inventario de lo que produce este build ─────────────────────────────────
+// dist/ se sirve tal cual, así que un archivo que sobra ahí es un archivo
+// publicado. El build nunca borraba —solo escribía encima—, y así quedaron
+// colgando en el sitio assets de configuraciones anteriores que nada
+// referenciaba. Ahora se anota todo lo que se emite y al final se poda lo que
+// no esté en la lista.
+const generados = new Set();
+
+function escribir(destino, contenido) {
+  mkdirSync(path.dirname(destino), { recursive: true });
+  writeFileSync(destino, contenido);
+  generados.add(path.resolve(destino));
+}
+
+function copiar(origen, destino) {
+  mkdirSync(path.dirname(destino), { recursive: true });
+  copyFileSync(origen, destino);
+  generados.add(path.resolve(destino));
+}
+
+function archivosBajo(dir) {
+  const encontrados = [];
+  for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+    const ruta = path.join(dir, entrada.name);
+    if (entrada.isDirectory()) encontrados.push(...archivosBajo(ruta));
+    else encontrados.push(ruta);
+  }
+  return encontrados;
+}
+
+// Borra los directorios que hayan quedado vacíos después de podar.
+function limpiarVacios(dir) {
+  for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+    if (entrada.isDirectory()) limpiarVacios(path.join(dir, entrada.name));
+  }
+  if (dir !== DIST_DIR && readdirSync(dir).length === 0) rmSync(dir, { recursive: true });
+}
+
+/**
+ * Deja dist/ con exactamente lo que corresponde a data/.
+ *
+ * Distingue dos casos, porque no son lo mismo:
+ *  · Archivos sueltos dentro de la carpeta de alguien que sigue publicado
+ *    (el logo de una configuración anterior, un plano que ya no se usa): sobran
+ *    y se borran sin más.
+ *  · La carpeta entera de alguien que ya no está en personas.json: eso es un
+ *    retiro. Se exige --retirar porque despublicar tiene consecuencias que
+ *    conviene mirar de frente —el QR ya impreso deja de resolver— y porque
+ *    quitar a alguien de data/ por accidente no debería borrarle la tarjeta en
+ *    silencio.
+ */
+function podar(slugsActivos) {
+  if (!existsSync(DIST_DIR)) return { sobrantes: [], retirados: [] };
+
+  const sobrantes = [];
+  const retirados = [];
+
+  for (const entrada of readdirSync(DIST_DIR, { withFileTypes: true })) {
+    const ruta = path.join(DIST_DIR, entrada.name);
+
+    if (!entrada.isDirectory()) {
+      if (!generados.has(path.resolve(ruta)) && !AJENOS_RAIZ.has(entrada.name)) {
+        sobrantes.push(ruta);
+      }
+      continue;
+    }
+
+    if (!slugsActivos.has(entrada.name)) {
+      retirados.push(ruta);
+      continue;
+    }
+
+    for (const archivo of archivosBajo(ruta)) {
+      if (generados.has(path.resolve(archivo))) continue;
+      if (AJENOS.has(path.basename(archivo))) continue;
+      sobrantes.push(archivo);
+    }
+  }
+
+  for (const ruta of sobrantes) rmSync(ruta);
+  if (RETIRAR) for (const ruta of retirados) rmSync(ruta, { recursive: true });
+  limpiarVacios(DIST_DIR);
+
+  return { sobrantes, retirados };
 }
 
 // Los colores tienen dos consumidores con criterios distintos: el CSS, que
@@ -712,7 +812,7 @@ for (const personaCruda of personas) {
     mkdirSync(assetsOutDir, { recursive: true });
 
     for (const archivo of [logoFile, logoClaroFile, fondoPlanoFile].filter(Boolean)) {
-      copyFileSync(path.join(logoDir, archivo), path.join(assetsOutDir, archivo));
+      copiar(path.join(logoDir, archivo), path.join(assetsOutDir, archivo));
     }
 
     // qr.png, contacto.vcf, tarjeta-whatsapp.png y la fuente se generan o copian
@@ -726,9 +826,9 @@ for (const personaCruda of personas) {
     };
 
     const cardTemplate = readFileSync(path.join(TEMPLATES_DIR, tema, 'card.html'), 'utf8');
-    writeFileSync(path.join(outDir, 'index.html'), render(cardTemplate, valores));
+    escribir(path.join(outDir, 'index.html'), render(cardTemplate, valores));
     const styleTemplate = readFileSync(path.join(TEMPLATES_DIR, tema, 'style.css'), 'utf8');
-    writeFileSync(path.join(outDir, 'style.css'), render(styleTemplate, valores));
+    escribir(path.join(outDir, 'style.css'), render(styleTemplate, valores));
 
     const prefijo = esActivo ? '' : `${tema}/`;
     archivosGenerados.push(
@@ -737,11 +837,11 @@ for (const personaCruda of personas) {
     );
   }
 
-  writeFileSync(path.join(baseDir, 'contacto.vcf'), construirVCard({ persona, marca }));
+  escribir(path.join(baseDir, 'contacto.vcf'), construirVCard({ persona, marca }));
   archivosGenerados.push('contacto.vcf');
 
   if (existsSync(FUENTE_ORIGEN)) {
-    copyFileSync(FUENTE_ORIGEN, path.join(baseDir, 'assets', FUENTE_ARCHIVO));
+    copiar(FUENTE_ORIGEN, path.join(baseDir, 'assets', FUENTE_ARCHIVO));
     archivosGenerados.push(`assets/${FUENTE_ARCHIVO}`);
   } else {
     console.warn(`⚠ falta ${FUENTE_ORIGEN}: la tarjeta caerá a la sans-serif del sistema.`);
@@ -815,7 +915,7 @@ for (const personaCruda of personas) {
 // se escapaba en la rama del redirect. Ahora todo lo interpolado pasa por
 // escapeHtml, aunque el esquema ya no deje pasar un slug así.
 const destinoRaiz = resumen.length === 1 ? escapeHtml(`./${resumen[0].slug}/`) : null;
-writeFileSync(
+escribir(
   path.join(DIST_DIR, 'index.html'),
   destinoRaiz
     ? `<!doctype html>
@@ -848,16 +948,32 @@ ${resumen
 
 // GitHub Pages procesa el sitio con Jekyll si no encuentra este archivo, y Jekyll
 // ignora todo lo que empiece por guion bajo.
-writeFileSync(path.join(DIST_DIR, '.nojekyll'), '');
+escribir(path.join(DIST_DIR, '.nojekyll'), '');
 
 // Refuerza el noindex de las plantillas a nivel de sitio. No es una medida de
 // seguridad —quien tenga el enlace entra igual— pero evita que los datos de
 // contacto terminen en buscadores y en los raspadores que sí respetan el
 // archivo. Lo que no debe ser público, simplemente no se pone en data/.
-writeFileSync(
+escribir(
   path.join(DIST_DIR, 'robots.txt'),
   ['User-agent: *', 'Disallow: /', ''].join('\n')
 );
+
+// Poda: dist/ debe contener exactamente lo que corresponde a data/, ni más.
+const { sobrantes, retirados } = podar(new Set(resumen.map((item) => item.slug)));
+
+if (retirados.length && !RETIRAR) {
+  console.error(
+    `\n✗ Hay ${retirados.length} tarjeta(s) publicada(s) que ya no están en personas.json:\n` +
+      retirados.map((ruta) => `    dist/${path.relative(DIST_DIR, ruta)}/`).join('\n') +
+      '\n\n  Quitar a alguien de data/ no lo despublica: la carpeta sigue en dist/ y\n' +
+      '  sigue sirviéndose en la URL que lleva grabada su QR impreso.\n\n' +
+      '  Si es un retiro de verdad:  node scripts/build.mjs --retirar\n' +
+      '  Si fue un descuido:         devuelve la ficha a data/personas.json\n' +
+      '  El procedimiento completo está en el README ("Retirar a una persona").'
+  );
+  process.exit(1);
+}
 
 // Manifiesto: la única entrada de generar_imagenes.py. Que ese script no vuelva
 // a leer data/ es lo que garantiza que no exista un segundo consumidor de datos
@@ -878,4 +994,11 @@ for (const item of resumen) {
     console.log('    ⚠ sin logo encontrado en assets/, se usará el fallback de texto en la tarjeta');
   }
 }
+for (const ruta of sobrantes) {
+  console.log(`  ✂ sobraba en el sitio, se borró: dist/${path.relative(DIST_DIR, ruta)}`);
+}
+for (const ruta of retirados) {
+  console.log(`  ✂ retirada del sitio: dist/${path.relative(DIST_DIR, ruta)}/`);
+}
+
 console.log(`\n${resumen.length} tarjeta(s) generada(s) en dist/  ·  temas: ${temas.join(', ')}`);

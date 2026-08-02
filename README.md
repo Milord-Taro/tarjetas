@@ -67,6 +67,41 @@ Antes de sumar a otra persona hay que pedirle consentimiento explícito por cada
 dato que se publique: son datos personales de un tercero y aplica la Ley 1581 de
 2012.
 
+### Retirar a una persona
+
+La Ley 1581 da derecho a pedir la supresión de los datos, y ese derecho no se
+satisface quitando el enlace. Quitar la ficha de `data/personas.json` **no**
+despublicaba nada: la carpeta seguía en `dist/`, servida en la misma URL que
+lleva grabada el QR ya impreso, solo que sin aparecer en el índice. Ahora el
+build se planta si detecta una tarjeta publicada que ya no tiene ficha.
+
+```bash
+# 1. quitar la ficha de data/personas.json
+node scripts/build.mjs --retirar     # borra dist/{slug}/ del sitio
+python3 scripts/generar_imagenes.py
+git add -A && git commit && git push # el push despliega y la URL deja de resolver
+```
+
+`--retirar` existe para que despublicar sea una decisión y no un descuido: sin
+la bandera el build falla y explica las dos salidas posibles.
+
+Dos cosas que conviene decir de frente antes de que alguien firme:
+
+- **El material impreso deja de funcionar.** Es el efecto buscado en un retiro,
+  pero si lo que se quería era corregir un dato, cambiar el `slug` tiene el
+  mismo costo que retirar: el QR ya repartido apunta a la URL vieja.
+- **El historial es otra cosa.** El repo es público y `dist/` se versiona, así
+  que todas las versiones anteriores de la tarjeta siguen en el historial de git
+  aunque el sitio ya no las sirva. Borrarlas de verdad exige reescribir el
+  historial (`git filter-repo`) y un force push, y aun así GitHub puede
+  conservar la copia en caché y en los forks que existan. Por eso la
+  autorización debería decir que la publicación es en un sitio público con
+  historial, y por eso la regla sigue siendo la de arriba: lo que no deba ser
+  público no entra en `data/`.
+
+Después de un force push, **comprobar que el workflow corrió**. Es exactamente
+el caso que falló antes (ver "Publicación").
+
 ### Cómo trata el build los datos de entrada
 
 Hoy los JSON los escribe quien mantiene el repo, pero la idea es que cada
@@ -152,6 +187,18 @@ activo se define en `data/config.json` → `"tema"`:
 
 `qr.png`, `contacto.vcf` y `tarjeta-whatsapp.png` se generan una sola vez en la
 raíz de cada persona; los temas secundarios los referencian un nivel arriba.
+
+## Qué hay en dist/
+
+`dist/` se sirve tal cual, así que un archivo que sobra ahí es un archivo
+publicado. El build lleva el inventario de lo que emite y al final poda lo que
+no esté en la lista: si una marca cambia de logo o de plano de fondo, el
+anterior desaparece del sitio en vez de quedarse colgando (así se habían
+acumulado cuatro assets que ya nada referenciaba). Lo único que respeta sin
+haberlo generado es `qr.png` y `tarjeta-whatsapp.png`, que vienen del script de
+Python, y `.gitkeep`.
+
+La carpeta completa de una persona es caso aparte: ver "Retirar a una persona".
 
 ## Colores
 
