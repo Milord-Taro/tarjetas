@@ -1,0 +1,556 @@
+/* Tarjeta digital — tema v2 "secundarios".
+   Arte tomado del roll-up aprobado: cabecera carbón cortada en chevron sobre una
+   cuña olivo, cuerpo en crema, badges circulares olivo y pie olivo.
+   La información es la misma de la v1 (nada se quita, se suman WhatsApp y LinkedIn). */
+
+:root {
+  /* Valores por defecto (TOPP CREATE); card.html los sobreescribe por marca. */
+  --color-oscuro: #4D4D4D;
+  --color-claro: #B3B3B3;
+  --color-fondo: #FFFFFF;
+
+  /* Paleta secundaria: no está en el manual de marca, sale del arte del roll-up. */
+  --color-carbon: #24292D;
+  --color-olivo: #83855B;
+  --color-olivo-texto: #6B6C47; /* olivo oscurecido: el olivo base no da contraste AA en texto pequeño */
+  --color-olivo-claro: #A8AA7C; /* olivo aclarado: para texto sobre el carbón */
+  --color-crema: #F4F1EC;
+
+  --fuente-marca: 'Montserrat', sans-serif;
+  --logo-marca: none;
+
+  /* Geometría del corte de la cabecera, medida sobre el roll-up y normalizada al
+     ancho de la tarjeta. Todo se deriva de --corte-prof (la profundidad total,
+     que es donde llega la punta izquierda del olivo):
+       · olivo  → diagonal simple, sube de izquierda a derecha
+       · carbón → chevron, con el vértice al 20% del ancho
+     La franja olivo queda delgada a la derecha y como cuña ancha a la izquierda,
+     que es justo lo que da el aire del arte original. */
+  --corte-prof: 112px;
+  --corte-vertice-x: 20%;
+
+  /* Escala de espaciado — mismo valor en cada transición equivalente. */
+  --e-pad-tarjeta: 1.75rem;      /* 28px — margen lateral del cuerpo */
+  --e-cabecera-top: 1.5rem;      /* 24px */
+  --e-logo-tagline: 0.8rem;      /* 13px */
+  --e-cabecera-nombre: 1.25rem;  /* 20px */
+  --e-nombre-cargo: 0.6rem;      /* 10px */
+  --e-cargo-bloque: 1.25rem;     /* 20px */
+  --e-titulo-dato: 0.9rem;       /* 14px */
+  --e-entre-datos: 0.7rem;       /* 11px */
+  --e-entre-bloques: 1.2rem;     /* 19px */
+  --e-bloques-redes: 1.2rem;     /* 19px */
+  --e-redes-boton: 1rem;         /* 16px */
+  --e-boton-qr: 1.25rem;         /* 20px */
+  --e-qr-caption: 0.85rem;       /* 14px */
+
+  --ancho-tarjeta: 420px;
+  --badge-tamano: 38px;
+  --badge-red-tamano: 40px;
+  --marca-corner-tamano: 26px;
+  --marca-corner-margen: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  /* Fondo de página: el crema apenas oscurecido, para que la tarjeta se despegue. */
+  background: #E7E2DA;
+  background: color-mix(in srgb, var(--color-crema) 84%, var(--color-carbon) 16%);
+  font-family: var(--fuente-marca);
+  font-weight: 400;
+  color: var(--color-carbon);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Textura de fondo en pantallas anchas: solo el logotipo repetido en diagonal, muy
+   sutil. background-size respeta la proporción real del logo (no lo deforma) y
+   background-repeat:space reparte las copias con aire parejo para que no se
+   toquen ni se empalmen entre sí. */
+body::before {
+  content: "";
+  display: none;
+  position: fixed;
+  inset: -25%;
+  background-image: var(--logo-marca);
+  background-repeat: space;
+  background-size: 130px 105px;
+  transform: rotate(15deg);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (min-width: 900px) {
+  body::before {
+    display: block;
+  }
+}
+
+.tarjeta {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: var(--ancho-tarjeta);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-crema);
+  overflow: hidden; /* recorta las capas de la cabecera contra los bordes */
+}
+
+@media (min-width: 480px) {
+  .tarjeta {
+    margin: 2rem 0;
+    box-shadow: 0 18px 50px rgba(36, 41, 45, 0.16);
+  }
+}
+
+/* En pantallas angostas el corte se achica: si no, a 320px de ancho se comería
+   una porción desproporcionada de la cabecera. */
+@media (max-width: 380px) {
+  :root {
+    --corte-prof: 92px;
+    --e-pad-tarjeta: 1.4rem;
+  }
+}
+
+/* ── Cabecera ────────────────────────────────────────────────────────────── */
+.cabecera {
+  position: relative;
+  /* Capa de abajo: el olivo, con corte diagonal simple. */
+  background: var(--color-olivo);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--corte-prof) * 0.9),
+    0 100%
+  );
+  padding: var(--e-cabecera-top) var(--e-pad-tarjeta)
+           calc(var(--corte-prof) + 0.5rem);
+}
+
+/* Capa de encima: el carbón, con corte en chevron. */
+.cabecera::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-carbon);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--corte-prof)),
+    var(--corte-vertice-x) calc(100% - var(--corte-prof) * 0.25),
+    0 calc(100% - var(--corte-prof) * 0.52)
+  );
+}
+
+.cabecera__contenido {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.cabecera .logo {
+  display: block;
+  margin: 0 auto;
+  width: 130px;
+  max-width: 50%;
+  height: auto;
+}
+
+.logo-fallback {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 1.15rem;
+  color: var(--color-fondo);
+}
+
+/* Tagline: palabras en claro y separadores en olivo, como el original. */
+.cabecera__tagline {
+  margin: var(--e-logo-tagline) 0 0;
+  font-size: 0.6rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-crema);
+}
+
+.cabecera__tagline .sep {
+  color: var(--color-olivo-claro);
+  padding: 0 0.35em;
+}
+
+/* ── Cuerpo ──────────────────────────────────────────────────────────────── */
+.cuerpo {
+  position: relative;
+  padding: var(--e-cabecera-nombre) var(--e-pad-tarjeta) 0;
+}
+
+/* El contenido del cuerpo va sobre el plano de fondo. */
+.cuerpo > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Marca de esquina tipo plano arquitectónico — se conserva de la v1. */
+.cuerpo::before {
+  content: "";
+  position: absolute;
+  top: var(--marca-corner-margen);
+  left: var(--marca-corner-margen);
+  width: var(--marca-corner-tamano);
+  height: var(--marca-corner-tamano);
+  border-top: 1px solid var(--color-olivo);
+  border-left: 1px solid var(--color-olivo);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Plano de fondo: lo genera scripts/generar_planos.py. Cubre todo el rectángulo
+   del cuerpo a muy baja opacidad — da el aire de estudio de arquitectura sin
+   competir con la información. El prototipo se elige en marcas.json. */
+.cuerpo::after {
+  content: "";
+  position: absolute;
+  /* Arranca por encima del nombre, tucado bajo el corte de la cabecera. */
+  top: -1.75rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: var(--fondo-plano);
+  /* El fondo es un pliego vertical (varias vistas apiladas) con la proporción de
+     la tarjeta: entra completo a lo ancho —sin recorte lateral— y cubre todo el
+     alto de una sola pasada, sin repetirse. Con "cover" el trazo salía grueso y
+     competía con el texto; con repeat-y se veía el empalme. */
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% auto;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.identidad {
+  margin-bottom: var(--e-cargo-bloque);
+  text-align: center;
+}
+
+.identidad__nombre {
+  margin: 0;
+  /* Una sola línea: el cuerpo se adapta al ancho para que "Daniel J. Manotas C."
+     entre completo también en pantallas de 320px. */
+  font-size: clamp(1.25rem, 6.1vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+.identidad__pila {
+  color: var(--color-carbon);
+}
+
+.identidad__apellidos {
+  color: var(--color-olivo);
+}
+
+.identidad__cargo {
+  margin: var(--e-nombre-cargo) 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-oscuro);
+}
+
+.identidad__regla {
+  display: block;
+  width: 46px;
+  height: 2px;
+  margin: 0.7rem auto 0;
+  background: var(--color-olivo);
+}
+
+/* ── Bloques de contacto (Personal arriba, Empresa abajo) ────────────────── */
+.bloque + .bloque {
+  margin-top: var(--e-entre-bloques);
+}
+
+.bloque__titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 var(--e-titulo-dato);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-olivo-texto);
+}
+
+/* Regla fina que completa el ancho a la derecha del título. */
+.bloque__titulo::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-olivo);
+  opacity: 0.45;
+}
+
+.contactos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contacto {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.contacto--direccion {
+  align-items: flex-start;
+}
+
+.contacto--direccion .contacto__badge {
+  margin-top: 0.2rem;
+}
+
+.contacto__badge {
+  flex: none;
+  width: var(--badge-tamano);
+  height: var(--badge-tamano);
+  border-radius: 50%;
+  background: var(--color-olivo);
+  color: var(--color-fondo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.contacto__badge svg {
+  width: 52%;
+  height: 52%;
+}
+
+/* Línea fina bajo cada dato, arrancando después del badge — como el original. */
+.contacto__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--e-entre-datos) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-olivo) 35%, transparent);
+}
+
+.contacto:last-child .contacto__texto {
+  border-bottom: none;
+}
+
+.contacto__etiqueta {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-olivo-texto);
+}
+
+.contacto__valor {
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--color-carbon);
+  text-decoration: none;
+  word-break: break-word;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.contacto__valor:hover {
+  border-bottom-color: var(--color-olivo);
+}
+
+/* ── Redes ───────────────────────────────────────────────────────────────── */
+/* Grilla de columnas iguales: así los tres círculos quedan a distancias
+   homogéneas entre sí y respecto de los bordes, independiente de lo que mida
+   cada etiqueta (con flex, "toppcreate.com" empujaba y descentraba la fila). */
+.redes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: var(--e-bloques-redes) 0 var(--e-redes-boton);
+}
+
+.red {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.red__badge {
+  width: var(--badge-red-tamano);
+  height: var(--badge-red-tamano);
+  border-radius: 50%;
+  border: 1px solid var(--color-olivo);
+  color: var(--color-olivo-texto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.red__badge svg {
+  width: 50%;
+  height: 50%;
+}
+
+.red__etiqueta {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-oscuro);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.red:hover .red__badge {
+  background: var(--color-olivo);
+  color: var(--color-fondo);
+}
+
+/* ── Acciones ────────────────────────────────────────────────────────────── */
+.acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: var(--e-boton-qr);
+}
+
+.boton {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 0.95rem 2rem;
+  background: var(--color-carbon);
+  color: var(--color-crema);
+  font-family: var(--fuente-marca);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
+}
+
+.boton:hover {
+  background: var(--color-olivo-texto);
+}
+
+/* Descarga secundaria: mismo cuerpo que el botón principal pero en versión
+   contorneada, para que se lea como una acción de segundo nivel y no como un
+   enlace suelto pegado abajo. */
+.descarga {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  border: 1px solid var(--color-olivo);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--color-olivo-texto);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.descarga__icono {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.descarga:hover {
+  background: var(--color-olivo);
+  color: var(--color-fondo);
+}
+
+/* ── QR ──────────────────────────────────────────────────────────────────── */
+.qr {
+  text-align: center;
+  padding-bottom: 1.25rem;
+}
+
+.qr__marco {
+  display: inline-block;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--color-carbon);
+  line-height: 0;
+}
+
+.qr__marco img {
+  width: 148px;
+  height: 148px;
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.qr__caption {
+  margin: var(--e-qr-caption) 0 0;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--color-olivo-texto);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* ── Pie ─────────────────────────────────────────────────────────────────── */
+.pie {
+  background: var(--color-olivo);
+  text-align: center;
+  padding: 1.1rem 1rem;
+}
+
+.pie a {
+  color: var(--color-fondo);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  text-decoration: none;
+}
+
+/* Accesibilidad */
+a:focus-visible {
+  outline: 2px solid var(--color-carbon);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

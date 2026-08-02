@@ -1,0 +1,40 @@
+[
+  {
+    "id": "topp-create",
+    "nombre": "TOPP CREATE",
+    "tagline": [
+      "Arquitectura",
+      "Diseño",
+      "Construcción"
+    ],
+    "colores": {
+      "oscuro": "#4D4D4D",
+      "claro": "#B3B3B3",
+      "fondo": "#FFFFFF"
+    },
+    "colores_secundarios": {
+      "carbon": "#24292D",
+      "olivo": "#83855B",
+      "olivo_texto": "#6B6C47",
+      "olivo_claro": "#A8AA7C",
+      "crema": "#F4F1EC"
+    },
+    "tipografia": "Montserrat",
+    "logo": "logo-vertical-gris.png",
+    "logo_claro": "logo-vertical-blanco.png",
+    "logo_emblema": "logo-emblema-gris.png",
+    "ilustracion": "edificio-linea.svg",
+    "ilustracion_png": "edificio-linea.png",
+    "telefono_display": "+57 302 262 9945",
+    "whatsapp": "573022629945",
+    "email": "info@toppcreate.com",
+    "instagram": "toppcreate",
+    "sitio_web": "https://toppcreate.com/",
+    "direccion": [
+      "Centro Comercial Las Ramblas, Local 111",
+      "Cartagena de Indias, Bolívar"
+    ],
+    "fondo_plano": "fondo-plano-habs.png",
+    "fondo_plano_png": "fondo-plano-habs.png"
+  }
+]

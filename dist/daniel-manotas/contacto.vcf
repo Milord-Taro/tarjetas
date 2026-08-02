@@ -1,0 +1,15 @@
+BEGIN:VCARD
+VERSION:3.0
+N:;Daniel J. Manotas C.;;;
+FN:Daniel J. Manotas C.
+ORG:TOPP CREATE
+TITLE:Co-Fundador
+TEL;TYPE=CELL:+573022629945
+TEL;TYPE=WORK:+573022629945
+EMAIL:arq.danielmanotas@toppcreate.com
+EMAIL;TYPE=WORK:info@toppcreate.com
+URL:https://toppcreate.com/
+X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/daniel-j-manotas-a83a105b/
+X-SOCIALPROFILE;TYPE=instagram:https://instagram.com/toppcreate
+ADR;TYPE=WORK:;;Centro Comercial Las Ramblas\, Local 111\, Cartagena de Indias\, Bolívar;;;;
+END:VCARD

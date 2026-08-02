@@ -1,0 +1,35 @@
+# Publica dist/ tal cual está commiteado. El build no corre aquí a propósito:
+# generar_imagenes.py depende de Pillow y de las fuentes locales, y el QR debe
+# revisarse a ojo antes de imprimirse, así que se genera en local y se versiona.
+name: Publicar en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['dist/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si se empujan dos veces seguidas, que gane la última sin cancelar un deploy en curso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,376 @@
+/* Estilos base de la tarjeta digital — paleta monocromática, tipografía Montserrat. */
+
+:root {
+  /* Valores por defecto (TOPP CREATE); card.html los sobreescribe por marca. */
+  --color-oscuro: #4D4D4D;
+  --color-claro: #B3B3B3;
+  --color-fondo: #FFFFFF;
+  --fuente-marca: 'Montserrat', sans-serif;
+  --logo-marca: none;
+
+  /* Escala de espaciado — mismo valor en cada transición equivalente. */
+  --e-pad-tarjeta: 2rem;       /* 32px */
+  --e-logo-nombre: 2.5rem;     /* 40px */
+  --e-nombre-cargo: 0.5rem;    /* 8px */
+  --e-cargo-separador: 1.5rem; /* 24px */
+  --e-separador-titulo: 1rem;  /* 16px */
+  --e-titulo-dato: 0.75rem;    /* 12px */
+  --e-entre-datos: 0.5rem;     /* 8px */
+  --e-seccion-separador: 1.25rem; /* 20px — fin de sección → siguiente separador */
+  --e-enlaces-boton: 1.5rem;   /* 24px */
+  --e-boton-qr: 2rem;          /* 32px */
+  --e-qr-caption: 0.75rem;     /* 12px */
+  --e-icono-texto: 0.5rem;     /* 8px */
+
+  --ancho-tarjeta: 440px;
+  --marca-corner-tamano: 30px;
+  --marca-corner-margen: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-fondo);
+  font-family: var(--fuente-marca);
+  font-weight: 400;
+  color: var(--color-oscuro);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Textura de fondo en pantallas anchas: solo el logotipo repetido en diagonal, muy
+   sutil. background-size respeta la proporción real del logo (no lo deforma) y
+   background-repeat:space reparte las copias con aire parejo para que no se
+   toquen ni se empalmen entre sí. */
+body::before {
+  content: "";
+  display: none;
+  position: fixed;
+  inset: -25%;
+  background-image: var(--logo-marca);
+  background-repeat: space;
+  background-size: 130px 105px;
+  transform: rotate(15deg);
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (min-width: 900px) {
+  body::before {
+    display: block;
+  }
+}
+
+.tarjeta {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: var(--ancho-tarjeta);
+  padding: var(--e-pad-tarjeta);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-fondo);
+}
+
+@media (min-width: 480px) {
+  .tarjeta {
+    margin: var(--e-pad-tarjeta) 0;
+    border: 1px solid var(--color-claro);
+  }
+}
+
+/* En pantallas de escritorio, compactar la escala de espaciado y el QR para que
+   toda la tarjeta quepa en una pantalla típica de 1080p sin necesidad de scroll. */
+@media (min-width: 900px) {
+  :root {
+    --e-pad-tarjeta: 1.5rem;
+    --e-logo-nombre: 1.5rem;
+    --e-nombre-cargo: 0.4rem;
+    --e-cargo-separador: 1rem;
+    --e-separador-titulo: 0.75rem;
+    --e-titulo-dato: 0.5rem;
+    --e-entre-datos: 0.4rem;
+    --e-seccion-separador: 0.75rem;
+    --e-enlaces-boton: 1rem;
+    --e-boton-qr: 1.25rem;
+    --e-qr-caption: 0.5rem;
+  }
+
+  .tarjeta {
+    margin: 1rem 0;
+  }
+
+  .qr img {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+/* Marcas de esquina tipo plano arquitectónico — sutiles, en dos esquinas opuestas. */
+.tarjeta::before,
+.tarjeta::after {
+  content: "";
+  position: absolute;
+  width: var(--marca-corner-tamano);
+  height: var(--marca-corner-tamano);
+  pointer-events: none;
+}
+
+.tarjeta::before {
+  top: var(--marca-corner-margen);
+  left: var(--marca-corner-margen);
+  border-top: 1px solid var(--color-claro);
+  border-left: 1px solid var(--color-claro);
+}
+
+.tarjeta::after {
+  bottom: var(--marca-corner-margen);
+  right: var(--marca-corner-margen);
+  border-bottom: 1px solid var(--color-claro);
+  border-right: 1px solid var(--color-claro);
+}
+
+/* Separador fino entre secciones */
+.separador {
+  border: none;
+  border-top: 1px solid var(--color-claro);
+  margin: 0;
+}
+
+/* Logo de marca */
+.tarjeta__marca {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 64px;
+  margin-bottom: var(--e-logo-nombre);
+}
+
+.tarjeta__marca .logo {
+  max-width: 70%;
+  max-height: 90px;
+  height: auto;
+}
+
+.logo-fallback {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  color: var(--color-oscuro);
+}
+
+/* Nombre y cargo */
+.tarjeta__persona {
+  text-align: center;
+  margin-bottom: var(--e-cargo-separador);
+}
+
+.tarjeta__persona h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tarjeta__persona .cargo {
+  margin: var(--e-nombre-cargo) 0 0;
+  font-size: 0.95rem;
+  font-weight: 300;
+  color: var(--color-claro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Secciones de contacto (jerárquicas: Personal arriba, Empresa abajo) */
+.seccion-contacto {
+  padding-top: var(--e-separador-titulo);
+  padding-bottom: var(--e-seccion-separador);
+}
+
+.seccion-contacto h2 {
+  margin: 0 0 var(--e-titulo-dato);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-claro);
+}
+
+.datos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-entre-datos);
+}
+
+.dato {
+  display: flex;
+  align-items: center;
+  gap: var(--e-icono-texto);
+}
+
+.dato--direccion {
+  align-items: flex-start;
+}
+
+.dato--direccion .icono {
+  margin-top: 0.2rem;
+}
+
+.icono {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--color-oscuro);
+}
+
+.icono--muted {
+  color: var(--color-claro);
+}
+
+.dato a,
+.direccion {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-oscuro);
+  text-decoration: none;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.dato a {
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.dato a:hover {
+  border-bottom-color: var(--color-oscuro);
+}
+
+.direccion {
+  color: var(--color-claro);
+}
+
+/* Enlaces de marca (sitio web + Instagram) */
+.enlaces {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: var(--e-separador-titulo);
+  padding-bottom: var(--e-enlaces-boton);
+}
+
+.enlaces a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-icono-texto);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-oscuro);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.enlaces a:hover {
+  text-decoration: underline;
+}
+
+.enlaces__separador {
+  color: var(--color-claro);
+}
+
+/* Acciones */
+.acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: var(--e-boton-qr);
+}
+
+.enlace-secundario {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-claro);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.enlace-secundario:hover {
+  text-decoration: underline;
+}
+
+.boton {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  padding: 0.9rem 2rem;
+  background: var(--color-oscuro);
+  color: var(--color-fondo);
+  font-family: var(--fuente-marca);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  border-radius: 2px;
+  transition: opacity 0.15s ease;
+}
+
+.boton:hover {
+  opacity: 0.85;
+}
+
+/* QR */
+.qr {
+  text-align: center;
+  padding-top: var(--e-titulo-dato);
+  border-top: 1px solid var(--color-claro);
+}
+
+.qr img {
+  width: 160px;
+  height: 160px;
+  max-width: 100%;
+}
+
+.qr__caption {
+  margin: var(--e-qr-caption) 0 0;
+  font-size: 0.8rem;
+  font-weight: 300;
+  color: var(--color-claro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Accesibilidad */
+a:focus-visible,
+.boton:focus-visible {
+  outline: 2px solid var(--color-oscuro);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

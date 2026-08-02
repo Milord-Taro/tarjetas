@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Material de origen bajado de Figma: es un proyecto aparte con su propio
+# control de versiones, no forma parte de la generación de las tarjetas.
+Diseño tarjeta presentación digital(1)/
