@@ -80,6 +80,11 @@ const CAMPOS_PERSONA = {
   // que ya lo traen. Antes de usarlo hay que resolver el EXIF (una foto trae
   // GPS y serial de cámara, y eso no se ve en el diff de un PR).
   foto: { tipo: 'archivo_o_nulo', dura: true },
+  // Aparecer en el índice de la raíz es opcional y por defecto no. Con una sola
+  // persona la raíz redirige a su tarjeta y da igual, pero con varias se
+  // convierte en un directorio de nombres y marcas en una URL adivinable, que
+  // es una pieza distinta de la que cada quien reparte por QR.
+  listar_en_indice: { tipo: 'booleano' },
 };
 
 const CAMPOS_MARCA = {
@@ -88,7 +93,11 @@ const CAMPOS_MARCA = {
   // era peor —publicaba la tarjeta con el hueco del nombre vacío y sin avisar—.
   nombre: { ...TEXTO, obligatorio: true, min: 1, dura: true },
   tagline: { tipo: 'lineas' },
-  colores: { tipo: 'colores', claves: ['oscuro', 'claro', 'fondo'] },
+  // Roles, no nombres de color: cada marca los rellena con los suyos y las
+  // plantillas se escriben una sola vez. Los tres primeros son obligatorios de
+  // hecho (hay valor por defecto para todos); apoyo y acento son opcionales y
+  // los usan las plantillas que los pidan.
+  colores: { tipo: 'colores', claves: ['oscuro', 'claro', 'fondo', 'apoyo', 'acento'] },
   colores_secundarios: {
     tipo: 'colores',
     claves: ['carbon', 'olivo', 'olivo_texto', 'olivo_claro', 'crema'],
@@ -108,6 +117,11 @@ const CAMPOS_MARCA = {
   linkedin: { tipo: 'url' },
   sitio_web: { tipo: 'url' },
   direccion: { tipo: 'lineas' },
+  // Dominios de correo de la marca. Opcional, pero si está, los correos de la
+  // marca y de su gente tienen que caer ahí: atrapa el dedazo en el dominio y,
+  // sobre todo, el correo de otra marca pegado en la ficha equivocada, que en
+  // un repo con varias marcas es un error fácil de cometer y difícil de ver.
+  dominios_correo: { tipo: 'dominios' },
 };
 
 const CAMPOS_CONFIG = {
@@ -163,10 +177,46 @@ const COMPROBACIONES = {
       ? null
       : 'debe tener entre 7 y 15 dígitos, con indicativo de país';
   },
-  tipografia: (valor) =>
-    typeof valor === 'string' && RE_TIPOGRAFIA.test(valor.trim())
-      ? null
-      : 'solo el nombre de la familia, alfanumérico',
+  // Dos formas: "Montserrat" (la familia a secas, cae a la sans del sistema si
+  // no hay archivo) o el objeto completo, que es lo que hace falta para servir
+  // la fuente de la marca desde el propio sitio.
+  //
+  // `licencia` es obligatoria cuando hay `archivo`, y no es burocracia:
+  // autoalojar un .ttf en un sitio público es redistribuirlo. Montserrat es OFL
+  // y no hay problema, pero una fuente de fundición necesita licencia webfont
+  // y eso no se ve mirando el archivo.
+  tipografia: (valor, campo, ruta, errores) => {
+    if (typeof valor === 'string') {
+      return RE_TIPOGRAFIA.test(valor.trim()) ? null : 'solo el nombre de la familia, alfanumérico';
+    }
+    if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) {
+      return 'debe ser el nombre de la familia o un objeto { familia, archivo, licencia }';
+    }
+    const conocidas = ['familia', 'archivo', 'licencia'];
+    for (const clave of Object.keys(valor)) {
+      if (!conocidas.includes(clave)) {
+        errores.push({ ruta: `${ruta}.${clave}`, mensaje: 'campo desconocido', dura: true });
+      }
+    }
+    if (!valor.familia || !RE_TIPOGRAFIA.test(String(valor.familia).trim())) {
+      errores.push({ ruta: `${ruta}.familia`, mensaje: 'falta o no es un nombre de familia', dura: true });
+    }
+    if (valor.archivo !== undefined) {
+      if (!RE_NOMBRE_ARCHIVO.test(String(valor.archivo))) {
+        errores.push({ ruta: `${ruta}.archivo`, mensaje: 'debe ser un nombre plano, sin "/" ni ".."', dura: true });
+      }
+      if (!valor.licencia) {
+        errores.push({
+          ruta: `${ruta}.licencia`,
+          mensaje:
+            'hace falta declararla: servir la fuente desde el sitio es redistribuirla, ' +
+            'y no toda licencia de escritorio lo permite (ej. "OFL-1.1")',
+          dura: true,
+        });
+      }
+    }
+    return null;
+  },
   url: (valor) => {
     if (typeof valor !== 'string') return `debe ser texto, no ${tipoDe(valor)}`;
     let url;
@@ -186,6 +236,13 @@ const COMPROBACIONES = {
       return 'debe ser una URL absoluta (con https://)';
     }
     return url.protocol === 'https:' ? null : 'debe ser https';
+  },
+  booleano: (valor) => (typeof valor === 'boolean' ? null : 'debe ser true o false'),
+  dominios: (valor) => {
+    if (!Array.isArray(valor) || valor.length === 0) return 'debe ser una lista de dominios';
+    return valor.every((d) => typeof d === 'string' && /^[a-z0-9.\-]+\.[a-z]{2,}$/i.test(d))
+      ? null
+      : 'cada entrada debe ser un dominio (ej. "toppcreate.com")';
   },
   lineas: (valor) => {
     const partes = Array.isArray(valor) ? valor : [valor];
@@ -279,7 +336,21 @@ export function validarDatos({ marcas, personas, config, temas = [] }) {
 
   validarObjeto(config, CAMPOS_CONFIG, 'config.json', encontrados);
 
+  // Comprueba que un correo caiga en los dominios que declaró su marca.
+  const revisarDominio = (correo, dominios, ruta) => {
+    if (!dominios || typeof correo !== 'string' || !correo.includes('@')) return;
+    const dominio = correo.split('@').pop().toLowerCase();
+    if (!dominios.some((d) => d.toLowerCase() === dominio)) {
+      encontrados.push({
+        ruta,
+        mensaje: `"${dominio}" no está entre los dominios de la marca (${dominios.join(', ')})`,
+        dura: true,
+      });
+    }
+  };
+
   const idsVistos = new Set();
+  const marcasPorId = new Map();
   marcas.forEach((marca, i) => {
     const ruta = `marcas.json[${i}]${marca?.id ? ` (${marca.id})` : ''}`;
     if (typeof marca !== 'object' || marca === null || Array.isArray(marca)) {
@@ -292,7 +363,9 @@ export function validarDatos({ marcas, personas, config, temas = [] }) {
         encontrados.push({ ruta: `${ruta}.id`, mensaje: `"${marca.id}" está repetido`, dura: true });
       }
       idsVistos.add(marca.id);
+      marcasPorId.set(marca.id, marca);
     }
+    revisarDominio(marca.email, marca.dominios_correo, `${ruta}.email`);
   });
 
   // Un slug igual a un nombre de tema chocaría con dist/{slug}/{tema}/.
@@ -350,6 +423,9 @@ export function validarDatos({ marcas, personas, config, temas = [] }) {
         dura: true,
       });
     }
+
+    const suMarca = tieneId ? marcasPorId.get(persona.marca_id) : persona.marca;
+    revisarDominio(persona.email, suMarca?.dominios_correo, `${ruta}.email`);
   });
 
   return separar(encontrados);

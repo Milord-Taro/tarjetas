@@ -20,6 +20,7 @@ const MARCAS = [
     nombre: 'TOPP CREATE',
     colores: { oscuro: '#4D4D4D', claro: '#B3B3B3', fondo: '#FFFFFF' },
     logo: 'logo-vertical-gris.png',
+    tipografia: { familia: 'Montserrat', archivo: 'Montserrat-Variable.ttf', licencia: 'OFL-1.1' },
   },
 ];
 const CONFIG = { base_url: 'https://ejemplo.test/tarjetas', tema: 'v2' };
@@ -155,6 +156,61 @@ test('la URL del QR la calcula el build, no la ficha', () => {
   assert.equal(estado, 0);
   const manifiesto = leerManifiesto(raiz);
   assert.equal(manifiesto.personas[0].url_publica, 'https://ejemplo.test/tarjetas/ana-perez/');
+});
+
+test('con varias personas, la raíz no enumera a nadie por defecto', () => {
+  const { dist } = compilar([
+    ficha({}),
+    ficha({ slug: 'luis-gomez', nombre: 'Luis Gómez' }),
+  ]);
+  const raiz = readFileSync(path.join(dist, 'index.html'), 'utf8');
+
+  assert.ok(!raiz.includes('Ana Pérez'), 'la raíz no debería listar a nadie sin permiso');
+  assert.ok(!raiz.includes('ana-perez'), 'ni siquiera el slug');
+  assert.match(raiz, /noindex/);
+  // Las tarjetas sí existen; lo que no existe es el directorio que las enumera.
+  assert.ok(existsSync(path.join(dist, 'ana-perez', 'index.html')));
+});
+
+test('quien lo pide sí aparece en el índice, y solo quien lo pide', () => {
+  const { dist } = compilar([
+    ficha({ listar_en_indice: true }),
+    ficha({ slug: 'luis-gomez', nombre: 'Luis Gómez' }),
+  ]);
+  const raiz = readFileSync(path.join(dist, 'index.html'), 'utf8');
+
+  assert.ok(raiz.includes('Ana Pérez'));
+  assert.ok(!raiz.includes('Luis Gómez'));
+});
+
+test('con una sola persona la raíz sigue redirigiendo a su tarjeta', () => {
+  const { dist } = compilar([ficha({})]);
+  assert.match(readFileSync(path.join(dist, 'index.html'), 'utf8'), /http-equiv="refresh"/);
+});
+
+test('la marca sin archivo de fuente no emite un @font-face roto', () => {
+  const marcas = [{ ...MARCAS[0], tipografia: 'Poppins' }];
+  const { estado, dist } = compilar([ficha({})], { marcas });
+  assert.equal(estado, 0);
+
+  const css = readFileSync(path.join(dist, 'ana-perez', 'style.css'), 'utf8');
+  assert.ok(!/^@font-face \{/m.test(css), 'sin archivo declarado no debe haber regla @font-face');
+  assert.ok(
+    readFileSync(path.join(dist, 'ana-perez', 'index.html'), 'utf8').includes("'Poppins', sans-serif"),
+    'la familia sí se aplica: cae a la sans del sistema'
+  );
+  assert.ok(!existsSync(path.join(dist, 'ana-perez', 'assets', 'Montserrat-Variable.ttf')));
+});
+
+test('la fuente declarada se copia y se referencia según el tema', () => {
+  const { dist } = compilar([ficha({})]);
+  assert.ok(existsSync(path.join(dist, 'ana-perez', 'assets', 'Montserrat-Variable.ttf')));
+
+  const activo = readFileSync(path.join(dist, 'ana-perez', 'style.css'), 'utf8');
+  assert.match(activo, /src: url\('\.\/assets\/Montserrat-Variable\.ttf'\)/);
+
+  const secundario = readFileSync(path.join(dist, 'ana-perez', 'v1', 'style.css'), 'utf8');
+  assert.match(secundario, /src: url\('\.\.\/assets\/Montserrat-Variable\.ttf'\)/);
 });
 
 test('poda los archivos que sobran dentro de una tarjeta activa', () => {

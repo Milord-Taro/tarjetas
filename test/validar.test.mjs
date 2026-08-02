@@ -147,6 +147,75 @@ test('base_url debe ser https: va grabada en el QR', () => {
   }
 });
 
+test('el correo debe caer en un dominio de su marca', () => {
+  const marcas = [{ ...MARCA, dominios_correo: ['toppcreate.com'] }];
+  const mal = validarDatos({
+    marcas,
+    personas: [ficha({ email: 'arq.ana@otramarca.com' })],
+    config: CONFIG,
+  });
+  assert.ok(mal.errores.some((e) => e.mensaje.includes('no está entre los dominios')));
+
+  const bien = validarDatos({
+    marcas,
+    personas: [ficha({ email: 'arq.ana@toppcreate.com' })],
+    config: CONFIG,
+  });
+  assert.deepEqual(bien.errores, []);
+});
+
+test('sin dominios_correo declarados no se exige nada', () => {
+  const { errores } = validar([ficha({ email: 'ana@loquesea.com' })]);
+  assert.deepEqual(errores, []);
+});
+
+test('una fuente propia obliga a declarar su licencia', () => {
+  // Servir un .ttf desde un sitio público es redistribuirlo, y no toda licencia
+  // de escritorio lo permite.
+  const sinLicencia = [{ ...MARCA, tipografia: { familia: 'Poppins', archivo: 'Poppins.ttf' } }];
+  const falla = validarDatos({ marcas: sinLicencia, personas: [ficha({})], config: CONFIG });
+  assert.ok(falla.errores.some((e) => e.ruta.endsWith('tipografia.licencia')));
+
+  const conLicencia = [
+    { ...MARCA, tipografia: { familia: 'Poppins', archivo: 'Poppins.ttf', licencia: 'OFL-1.1' } },
+  ];
+  const pasa = validarDatos({ marcas: conLicencia, personas: [ficha({})], config: CONFIG });
+  assert.deepEqual(pasa.errores, []);
+});
+
+test('la tipografía admite la forma corta y rechaza rutas en el archivo', () => {
+  assert.deepEqual(
+    validarDatos({ marcas: [{ ...MARCA, tipografia: 'Montserrat' }], personas: [ficha({})], config: CONFIG }).errores,
+    []
+  );
+  const conRuta = [
+    { ...MARCA, tipografia: { familia: 'X', archivo: '../../../etc/passwd', licencia: 'OFL-1.1' } },
+  ];
+  const { errores } = validarDatos({ marcas: conRuta, personas: [ficha({})], config: CONFIG });
+  assert.ok(errores.some((e) => e.ruta.endsWith('tipografia.archivo')));
+});
+
+test('listar_en_indice solo admite true o false', () => {
+  assert.deepEqual(validar([ficha({ listar_en_indice: true })]).errores, []);
+  const { errores, avisos } = validar([ficha({ listar_en_indice: 'sí' })]);
+  assert.ok([...errores, ...avisos].some((e) => e.ruta.endsWith('.listar_en_indice')));
+});
+
+test('la paleta admite los cinco roles del manual', () => {
+  const marcas = [
+    {
+      ...MARCA,
+      colores: {
+        oscuro: '#121212', claro: '#8E8B86', fondo: '#F5F2EB',
+        apoyo: '#C8C1B8', acento: '#2C2C2C',
+      },
+    },
+  ];
+  const { errores, avisos } = validarDatos({ marcas, personas: [ficha({})], config: CONFIG });
+  assert.deepEqual(errores, []);
+  assert.deepEqual(avisos, []);
+});
+
 test('un color mal escrito avisa pero no bloquea la publicación', () => {
   const marcas = [{ ...MARCA, colores: { oscuro: 'rojo', claro: '#B3B3B3', fondo: '#FFF' } }];
   const { errores, avisos } = validarDatos({ marcas, personas: [ficha({})], config: CONFIG });

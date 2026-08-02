@@ -30,6 +30,31 @@ build/               # manifiesto intermedio build.mjs → generar_imagenes.py (
 dist/                # salida generada, no se edita a mano (se publica en GitHub Pages)
 ```
 
+## Convenciones
+
+Lo que el validador exige y lo que es solo acuerdo, para que sumar gente y
+marcas no dependa de recordar cómo se hizo la vez pasada.
+
+| | Convención | ¿Lo revisa el build? |
+|---|---|---|
+| **slug** | `nombre-apellido`, minúsculas sin tildes, 3–40 caracteres | sí — y que sea único y no choque con `index`, `assets`, `robots` ni con un nombre de tema |
+| **id de marca** | igual que el slug (`topp-create`) | sí |
+| **correo** | el que fije cada marca; en TOPP CREATE, `arq.nombre@toppcreate.com` | el dominio sí, contra `dominios_correo` de la marca; el prefijo no |
+| **logos** | `logo-{vertical\|horizontal\|emblema}-{gris\|blanco}.png` en `assets/marcas/<id>/` | no — pero si falta el declarado, el build busca por esos nombres |
+| **fuentes** | `assets/marcas/<id>/fuentes/`, o `assets/fuentes/` si es compartida | sí — que exista y que declare licencia |
+| **procedencia** | `CREDITOS.md` por marca, con licencia de cada asset de terceros | no |
+
+El prefijo del correo se deja a cada marca a propósito: `arq.` funciona para
+arquitectos y se rompe con el primer ingeniero o abogado. Lo que sí se
+comprueba es el dominio, que es donde de verdad duele el error —un correo de
+otra marca pegado en la ficha equivocada es fácil de cometer y difícil de ver en
+un diff—.
+
+Sobre marcas incompletas: **sin logo** la tarjeta pone el nombre de la marca en
+versalitas (en la web y en el PNG); **sin dirección** desaparecen la fila
+"Oficina", el enlace a Maps y el `ADR` del vCard. Las dos cosas ya funcionan, no
+hay que hacer nada especial.
+
 ## Lógica de separación de carpetas
 
 - `assets/marcas/` es lo compartido a nivel empresa (logo, variantes). Un
@@ -202,12 +227,60 @@ La carpeta completa de una persona es caso aparte: ver "Retirar a una persona".
 
 ## Colores
 
-El manual de marca solo define los tres colores principales (`#4D4D4D`,
-`#B3B3B3`, `#FFFFFF`), en `marcas.json` → `colores`. La paleta secundaria de
-`colores_secundarios` (carbón `#24292D`, olivo `#83855B`, crema `#F4F1EC`) se
-tomó del arte del roll-up aprobado, no del manual. Los tonos `olivo_texto` y
-`olivo_claro` son variantes de contraste del mismo olivo, para que el texto
-pequeño cumpla AA sobre crema y sobre carbón.
+`marcas.json` → `colores` es el **manual de marca**. Los nombres del JSON son
+roles, no colores: cada marca los rellena con los suyos y las plantillas se
+escriben una sola vez.
+
+| Rol | TOPP CREATE | Nombre en el manual | Uso |
+|---|---|---|---|
+| `fondo` | `#F5F2EB` | Marfil | 70 % — fondos claros |
+| `oscuro` | `#121212` | Negro Ébano | 20 % — textos y fondos oscuros |
+| `claro` | `#8E8B86` | Gris Piedra | 8 % — elementos neutros |
+| `apoyo` | `#C8C1B8` | Taupe | 8 % — fondos y superficies neutras |
+| `acento` | `#2C2C2C` | Grafito | 2 % — líneas, iconos, resaltados |
+
+`apoyo` y `acento` son opcionales y todavía no los pide ninguna plantilla; el
+build igual los resuelve, así que están disponibles en cuanto un tema los use.
+
+`colores_secundarios` (carbón `#24292D`, olivo `#83855B`, crema `#F4F1EC`) es
+otra cosa: se tomó del arte del roll-up aprobado, no del manual, y es sobre lo
+que está construido el tema **v2**, que es el que se publica. Los tonos
+`olivo_texto` y `olivo_claro` son variantes de contraste del mismo olivo, para
+que el texto pequeño cumpla AA sobre crema y sobre carbón.
+
+Por eso conviven las dos paletas: **v1 usa solo el manual** (por eso siguió al
+manual nuevo en cuanto cambió `colores`) y **v2 usa casi solo el roll-up** (28
+usos contra 6). El manual nuevo no tiene olivo, así que llevar la tarjeta
+publicada a la paleta nueva es rehacer su arte, no cambiar unos valores: eso
+será un tema `v3` aparte, y la v2 se queda como está mientras tanto.
+
+## Tipografía
+
+Cada marca declara la suya en `marcas.json`:
+
+```json
+"tipografia": {
+  "familia": "Montserrat",
+  "archivo": "Montserrat-Variable.ttf",
+  "licencia": "OFL-1.1"
+}
+```
+
+También vale la forma corta (`"tipografia": "Montserrat"`), que solo nombra la
+familia: sin archivo no hay `@font-face` y la tarjeta cae a la sans-serif del
+sistema. Eso es intencional — mejor una tarjeta con otra tipografía que una
+fuente servida sin permiso.
+
+El archivo se busca primero en `assets/marcas/<id>/fuentes/` (lo propio de la
+marca) y luego en `assets/fuentes/` (lo compartido, que puede usar cualquiera).
+La misma fuente la usan la tarjeta web y el PNG de WhatsApp, para que no se vean
+de dos marcas distintas.
+
+**`licencia` es obligatoria cuando hay `archivo`, y no es burocracia:** servir un
+`.ttf` desde un sitio público es redistribuirlo. Montserrat es OFL y no hay
+problema, pero una fuente de fundición necesita licencia webfont, y eso no se ve
+mirando el archivo. El validador no deja publicar una fuente sin licencia
+declarada.
 
 ## Cómo regenerar
 
@@ -288,9 +361,15 @@ tests, que el build no escriba fuera de su directorio). Es `pull_request` y no
 repo base sobre código que nadie ha revisado todavía. Este workflow no despliega
 y no usa secretos.
 
-`dist/index.html` y `dist/.nojekyll` los genera `build.mjs`. El primero redirige
-la raíz a la única tarjeta (o lista todas, si hay varias); el segundo evita que
+`dist/index.html` y `dist/.nojekyll` los genera `build.mjs`; el segundo evita que
 Pages pase el sitio por Jekyll.
+
+La raíz se comporta distinto según cuánta gente haya. Con **una sola persona**
+redirige a su tarjeta: la raíz y la tarjeta son la misma cosa. Con **varias**,
+esa raíz pasaría a ser un directorio de nombres y marcas en una URL adivinable
+—una pieza distinta de la que cada quien reparte por QR, y que nadie
+autorizó—, así que solo aparece quien lo pida con `"listar_en_indice": true` en
+su ficha. Si no lo pide nadie, queda una página neutra sin nombres.
 
 ### Migrar a dominio propio
 

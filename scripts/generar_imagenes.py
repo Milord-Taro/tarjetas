@@ -81,9 +81,12 @@ QR_GAP = 48
 
 PIE_ALTO = 80
 
-# Directorios donde buscar Montserrat: primero el proyecto, luego el sistema.
-DIR_FUENTES_PROYECTO = ROOT / "assets" / "fuentes"
-DIR_FUENTES_SISTEMA = Path("/usr/share/fonts")
+# Tipografía de la marca que se está dibujando. La declara marcas.json y la
+# resuelve build.mjs, que es quien sabe si el archivo existe y bajo qué licencia
+# se puede servir; aquí solo se usa. Se fija por persona en main(), porque dos
+# marcas distintas pueden traer fuentes distintas.
+FUENTE_MARCA = None
+
 DIR_DEJAVU = Path("/usr/share/fonts/truetype/dejavu")
 
 PESOS = {"light": 300, "regular": 400, "medium": 500, "semibold": 600, "bold": 700}
@@ -105,35 +108,21 @@ def hex_a_rgb(color_hex):
     return tuple(int(texto[i : i + 2], 16) for i in (0, 2, 4))
 
 
-def buscar_fuente(patrones, directorios):
-    for directorio in directorios:
-        if not directorio.exists():
-            continue
-        for archivo in directorio.rglob("*.ttf"):
-            nombre = archivo.name.lower()
-            if any(patron in nombre for patron in patrones):
-                return archivo
-    return None
-
-
 def fuente(peso, tamano):
     """peso: 'bold' | 'semibold' | 'medium' | 'regular' | 'light'."""
-    # 1) Montserrat variable en el proyecto: un solo .ttf cubre todos los pesos.
-    variable = DIR_FUENTES_PROYECTO / "Montserrat-Variable.ttf"
-    if variable.exists():
-        fnt = ImageFont.truetype(str(variable), tamano)
-        fnt.set_variation_by_axes([PESOS[peso]])
+    # 1) La tipografía de la marca. Si es variable, un solo archivo cubre todos
+    # los pesos; si es estática, set_variation_by_axes falla y se usa tal cual
+    # (el peso lo dará la variante que la marca haya puesto en el archivo).
+    if FUENTE_MARCA and FUENTE_MARCA.exists():
+        fnt = ImageFont.truetype(str(FUENTE_MARCA), tamano)
+        try:
+            fnt.set_variation_by_axes([PESOS[peso]])
+        except OSError:
+            pass
         return fnt
 
-    # 2) Instancias estáticas de Montserrat instaladas en el sistema.
-    estatica = buscar_fuente(
-        [f"montserrat-{peso}", f"montserrat_{peso}"], [DIR_FUENTES_PROYECTO, DIR_FUENTES_SISTEMA]
-    )
-    if estatica:
-        return ImageFont.truetype(str(estatica), tamano)
-
-    # 3) Sin Montserrat: DejaVu Sans, que viene preinstalada. No es la tipografía
-    # corporativa, pero mantiene la legibilidad de la pieza.
+    # 2) Sin fuente de marca: DejaVu Sans, que viene preinstalada. No es la
+    # tipografía corporativa, pero mantiene la legibilidad de la pieza.
     nombre_dejavu = "DejaVuSans-Bold.ttf" if peso in ("bold", "semibold") else "DejaVuSans.ttf"
     ruta_dejavu = DIR_DEJAVU / nombre_dejavu
     if ruta_dejavu.exists():
@@ -739,6 +728,15 @@ def main():
 
         persona, marca = ficha["persona"], ficha["marca"]
         paleta = paleta_de(ficha)
+
+        # Misma tipografía que la tarjeta web, para que la imagen y la página no
+        # se vean de dos marcas distintas.
+        global FUENTE_MARCA
+        ruta_fuente = ficha["assets"].get("fuente")
+        FUENTE_MARCA = (ROOT / ruta_fuente) if ruta_fuente else None
+        if FUENTE_MARCA and not FUENTE_MARCA.is_relative_to(ROOT):
+            print(f"⚠ {slug}: la fuente queda fuera del repo, se ignora.")
+            FUENTE_MARCA = None
 
         # El logo claro (sobre el bloque carbón) va en dist/{slug}/assets/ porque
         # la web también lo usa; el emblema (dentro del QR) y el plano en PNG

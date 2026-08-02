@@ -60,12 +60,16 @@ const BUILD_DIR = path.join(path.dirname(DIST_DIR), 'build');
 
 const TEMA_POR_DEFECTO = 'v2';
 
-// Montserrat se sirve desde el propio sitio y no desde fonts.googleapis.com: si
-// no, cada persona que escanea el QR le entrega su IP y su User-Agent a Google
-// sin saberlo. De paso, la tarjeta se ve igual sin conexión. Es el mismo archivo
-// que usa generar_imagenes.py para los PNG.
-const FUENTE_ARCHIVO = 'Montserrat-Variable.ttf';
-const FUENTE_ORIGEN = path.join(ASSETS_DIR, 'fuentes', FUENTE_ARCHIVO);
+// La tipografía se sirve desde el propio sitio y no desde fonts.googleapis.com:
+// si no, cada persona que escanea el QR le entrega su IP y su User-Agent a
+// Google sin saberlo. De paso, la tarjeta se ve igual sin conexión. Es el mismo
+// archivo que usa generar_imagenes.py para los PNG.
+//
+// assets/fuentes/ son las compartidas, que puede usar cualquier marca; las
+// propias de una marca van en assets/marcas/<id>/fuentes/ y ganan sobre estas.
+const FUENTES_COMPARTIDAS = path.join(ASSETS_DIR, 'fuentes');
+
+const FORMATOS_FUENTE = { ttf: 'truetype', otf: 'opentype', woff2: 'woff2', woff: 'woff' };
 
 const LOGOS_CANDIDATOS = [
   'logo-vertical-gris.png',
@@ -307,6 +311,49 @@ function correoSeguro(valor, contexto) {
   if (RE_CORREO.test(texto)) return texto;
   avisar(contexto, `correo inválido ${JSON.stringify(texto)}, se ignora.`);
   return '';
+}
+
+// La marca declara su tipografía como "Montserrat" (solo la familia) o como
+// { familia, archivo, licencia }. Sin archivo, la tarjeta cae a la sans del
+// sistema: se ve peor pero no se rompe, y sobre todo no se sirve una fuente
+// cuya licencia nadie declaró.
+function resolverFuente(marca, logoDir, contexto) {
+  const declarada =
+    typeof marca.tipografia === 'object' && marca.tipografia !== null
+      ? marca.tipografia
+      : { familia: marca.tipografia };
+
+  const familia = tipografiaSegura(declarada.familia, 'Montserrat', `${contexto} familia`);
+  if (!declarada.archivo) return { familia, archivo: null, origen: null };
+
+  for (const dir of [path.join(logoDir, 'fuentes'), FUENTES_COMPARTIDAS]) {
+    if (!existsSync(dir)) continue;
+    const nombre = archivoSeguro(dir, declarada.archivo, `${contexto} archivo`);
+    if (nombre) return { familia, archivo: nombre, origen: path.join(dir, nombre) };
+  }
+
+  avisar(contexto, `no aparece ${JSON.stringify(declarada.archivo)}; "${familia}" caerá a la sans del sistema.`);
+  return { familia, archivo: null, origen: null };
+}
+
+// El @font-face lo emite el build y no la plantilla: la ruta cambia según el
+// tema (el activo ve ./assets/ y los secundarios ../assets/) y, sobre todo, una
+// marca sin archivo de fuente no debe emitir un @font-face que apunte a nada.
+function bloqueFontFace(fuente, baseRecursos) {
+  if (!fuente.archivo) return '';
+  const extension = path.extname(fuente.archivo).slice(1).toLowerCase();
+  const formato = FORMATOS_FUENTE[extension] ?? 'truetype';
+  return [
+    '@font-face {',
+    `  font-family: '${fuente.familia}';`,
+    `  src: url('${baseRecursos}assets/${encodeURIComponent(fuente.archivo)}') format('${formato}');`,
+    // Rango completo: si es una fuente variable, un solo archivo cubre de 100 a
+    // 900; si es estática, el navegador sintetiza y tampoco estorba.
+    '  font-weight: 100 900;',
+    '  font-style: normal;',
+    '  font-display: swap;',
+    '}',
+  ].join('\n');
 }
 
 function pickLogoFile(dir, preferido, contexto) {
@@ -724,6 +771,7 @@ for (const personaCruda of personas) {
   // emblema va dentro del QR y el plano en PNG de fondo. Se resuelven acá igual
   // porque generar_imagenes.py ya no lee data/ por su cuenta.
   const emblemaFile = archivoSeguro(logoDir, marca.logo_emblema, `${ctxArchivos} (logo_emblema)`);
+  const fuente = resolverFuente(marca, logoDir, `${slug} → tipografía`);
   const fondoPlanoPngFile = archivoSeguro(logoDir, marca.fondo_plano_png, `${ctxArchivos} (fondo_plano_png)`);
 
   const nombrePartido = partirNombre(persona);
@@ -741,6 +789,11 @@ for (const personaCruda of personas) {
     olivo_texto: colorSeguro(marca.colores_secundarios?.olivo_texto, '#6B6C47', `${ctxColores} olivo_texto`),
     olivo_claro: colorSeguro(marca.colores_secundarios?.olivo_claro, '#A8AA7C', `${ctxColores} olivo_claro`),
     crema: colorSeguro(marca.colores_secundarios?.crema, '#F4F1EC', `${ctxColores} crema`),
+    // Roles del manual que todavía no consume ninguna plantilla. Se resuelven
+    // igual para que estén disponibles en cuanto una los pida: render() solo
+    // sustituye lo que la plantilla nombra, así que no cuestan nada.
+    apoyo: colorSeguro(marca.colores?.apoyo, '#C8C1B8', `${ctxColores} apoyo`),
+    acento: colorSeguro(marca.colores?.acento, '#2C2C2C', `${ctxColores} acento`),
   };
 
   const camposEscapables = {
@@ -771,7 +824,9 @@ for (const personaCruda of personas) {
     'marca.color_olivo_texto': paletaResuelta.olivo_texto,
     'marca.color_olivo_claro': paletaResuelta.olivo_claro,
     'marca.color_crema': paletaResuelta.crema,
-    'marca.tipografia': tipografiaSegura(marca.tipografia, 'Montserrat', `${ctxColores} tipografia`),
+    'marca.color_apoyo': paletaResuelta.apoyo,
+    'marca.color_acento': paletaResuelta.acento,
+    'marca.tipografia': fuente.familia,
   };
   const valoresBase = Object.fromEntries(
     Object.entries(camposEscapables).map(([clave, valor]) => [clave, escapeHtml(valor)])
@@ -822,6 +877,7 @@ for (const personaCruda of personas) {
     const valores = {
       ...valoresBase,
       base_recursos: esActivo ? './' : '../',
+      fuente_face_css: bloqueFontFace(fuente, esActivo ? './' : '../'),
       contactos_html: contactosHtmlPorTema[tema] ?? contactosHtmlPorTema.v2,
     };
 
@@ -840,11 +896,9 @@ for (const personaCruda of personas) {
   escribir(path.join(baseDir, 'contacto.vcf'), construirVCard({ persona, marca }));
   archivosGenerados.push('contacto.vcf');
 
-  if (existsSync(FUENTE_ORIGEN)) {
-    copiar(FUENTE_ORIGEN, path.join(baseDir, 'assets', FUENTE_ARCHIVO));
-    archivosGenerados.push(`assets/${FUENTE_ARCHIVO}`);
-  } else {
-    console.warn(`⚠ falta ${FUENTE_ORIGEN}: la tarjeta caerá a la sans-serif del sistema.`);
+  if (fuente.origen) {
+    copiar(fuente.origen, path.join(baseDir, 'assets', fuente.archivo));
+    archivosGenerados.push(`assets/${fuente.archivo}`);
   }
 
   resumen.push({
@@ -852,6 +906,7 @@ for (const personaCruda of personas) {
     nombre: persona.nombre,
     marca: marca.nombre,
     logo: logoFile,
+    listar: persona.listar_en_indice === true,
     archivos: archivosGenerados,
   });
 
@@ -900,13 +955,21 @@ for (const personaCruda of personas) {
       logo: logoFile,
       logo_claro: logoClaroFile,
       logo_emblema: emblemaFile,
+      fuente: fuente.origen ? path.relative(ROOT, fuente.origen) : null,
       fondo_plano_png: fondoPlanoPngFile,
     },
   });
 }
 
-// La raíz del sitio publicado no es una tarjeta: con una sola persona redirige a
-// ella, y con varias lista las disponibles. Sin esto, entrar a la raíz da 404.
+// La raíz del sitio publicado no es una tarjeta. Sin este archivo, entrar a la
+// raíz da 404.
+//
+// Con una sola persona redirige a su tarjeta: la raíz y la tarjeta son la misma
+// cosa y quien llega ahí ya tiene la URL. Con varias, la raíz dejaría de ser un
+// atajo para convertirse en un directorio de nombres y marcas en una URL
+// adivinable —una pieza distinta de la que cada quien reparte por QR, y que
+// nadie autorizó—, así que solo aparece quien lo haya pedido con
+// `listar_en_indice: true`. Si no lo pide nadie, queda una página neutra.
 //
 // Este archivo lo arma el build a mano, fuera de las plantillas, y por eso se le
 // habían pasado dos cosas: el slug se interpolaba crudo en el href (un slug con
@@ -914,28 +977,37 @@ for (const personaCruda of personas) {
 // de Pages, que es compartido con los demás sitios de la cuenta) y el nombre no
 // se escapaba en la rama del redirect. Ahora todo lo interpolado pasa por
 // escapeHtml, aunque el esquema ya no deje pasar un slug así.
-const destinoRaiz = resumen.length === 1 ? escapeHtml(`./${resumen[0].slug}/`) : null;
-escribir(
-  path.join(DIST_DIR, 'index.html'),
-  destinoRaiz
-    ? `<!doctype html>
+const CABECERA_RAIZ = `<!doctype html>
 <html lang="es">
 <meta charset="utf-8">
 <title>Tarjetas de presentación</title>
-<meta name="robots" content="noindex, nofollow">
-<meta http-equiv="refresh" content="0; url=${destinoRaiz}">
-<link rel="canonical" href="${destinoRaiz}">
-<p>Redirigiendo a <a href="${destinoRaiz}">${escapeHtml(resumen[0].nombre)}</a>…</p>
+<meta name="robots" content="noindex, nofollow">`;
+
+const listables = resumen.filter((item) => item.listar);
+
+function paginaRaiz() {
+  if (resumen.length === 1) {
+    const destino = escapeHtml(`./${resumen[0].slug}/`);
+    return `${CABECERA_RAIZ}
+<meta http-equiv="refresh" content="0; url=${destino}">
+<link rel="canonical" href="${destino}">
+<p>Redirigiendo a <a href="${destino}">${escapeHtml(resumen[0].nombre)}</a>…</p>
 </html>
-`
-    : `<!doctype html>
-<html lang="es">
-<meta charset="utf-8">
-<title>Tarjetas de presentación</title>
-<meta name="robots" content="noindex, nofollow">
+`;
+  }
+
+  if (listables.length === 0) {
+    return `${CABECERA_RAIZ}
+<h1>Tarjetas de presentación</h1>
+<p>Cada tarjeta se reparte por su propio enlace.</p>
+</html>
+`;
+  }
+
+  return `${CABECERA_RAIZ}
 <h1>Tarjetas de presentación</h1>
 <ul>
-${resumen
+${listables
   .map(
     (item) =>
       `  <li><a href="${escapeHtml(`./${item.slug}/`)}">${escapeHtml(item.nombre)} — ${escapeHtml(item.marca)}</a></li>`
@@ -943,8 +1015,10 @@ ${resumen
   .join('\n')}
 </ul>
 </html>
-`
-);
+`;
+}
+
+escribir(path.join(DIST_DIR, 'index.html'), paginaRaiz());
 
 // GitHub Pages procesa el sitio con Jekyll si no encuentra este archivo, y Jekyll
 // ignora todo lo que empiece por guion bajo.

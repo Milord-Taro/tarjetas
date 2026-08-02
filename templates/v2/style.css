@@ -3,26 +3,22 @@
    cuña olivo, cuerpo en crema, badges circulares olivo y pie olivo.
    La información es la misma de la v1 (nada se quita, se suman WhatsApp y LinkedIn). */
 
-/* Montserrat servida desde el propio sitio: cargarla de fonts.googleapis.com
-   le entregaba la IP y el User-Agent de quien escanea el QR a un tercero, y
-   dejaba la tarjeta dependiendo de la red para verse bien. El archivo es una
-   fuente variable, así que un solo .ttf cubre de 100 a 900. Se guarda una sola
-   vez, en el assets/ de la persona, y por eso la ruta pasa por base_recursos:
-   el tema activo la ve en ./assets/ y los secundarios en ../assets/. Si una marca define otra tipografía en marcas.json,
-   esa cae a la sans-serif del sistema mientras no se agregue su archivo. */
-@font-face {
-  font-family: 'Montserrat';
-  src: url('{{base_recursos}}assets/Montserrat-Variable.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* La tipografía de la marca, servida desde el propio sitio: cargarla de
+   fonts.googleapis.com le entregaba la IP y el User-Agent de quien escanea el
+   QR a un tercero, y dejaba la tarjeta dependiendo de la red para verse bien.
+   El bloque lo emite build.mjs (marcas.json → tipografia) porque la ruta cambia
+   según el tema —el activo la ve en ./assets/ y los secundarios en ../assets/—
+   y porque una marca sin archivo de fuente no debe emitir un @font-face que
+   apunte a nada: en ese caso esto queda vacío y la tarjeta cae a la sans-serif
+   del sistema. */
+{{fuente_face_css}}
 
 :root {
-  /* Valores por defecto (TOPP CREATE); card.html los sobreescribe por marca. */
-  --color-oscuro: #4D4D4D;
-  --color-claro: #B3B3B3;
-  --color-fondo: #FFFFFF;
+  /* Respaldo por si faltara el bloque que inyecta card.html: son los del manual
+     de TOPP CREATE, pero cada marca los sobreescribe con los suyos. */
+  --color-oscuro: #121212;  /* Negro Ébano */
+  --color-claro: #8E8B86;   /* Gris Piedra */
+  --color-fondo: #F5F2EB;   /* Marfil */
 
   /* Paleta secundaria: no está en el manual de marca, sale del arte del roll-up. */
   --color-carbon: #24292D;
