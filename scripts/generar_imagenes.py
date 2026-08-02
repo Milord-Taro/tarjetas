@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 import qrcode
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -118,6 +118,19 @@ PIE_ALTO = 80
 # se puede servir; aquí solo se usa. Se fija por persona en main(), porque dos
 # marcas distintas pueden traer fuentes distintas.
 FUENTE_MARCA = None
+
+# Iconos propios de la marca que reemplazan a los dibujados con primitivas. Los
+# decide build.mjs según el tema y llegan por el manifiesto; el rol que no esté
+# aquí se sigue dibujando como siempre.
+ICONOS_MARCA = {}
+
+# El archivo viene sobre un lienzo de 150 con el dibujo ocupando entre el 46% y
+# el 62%. Se recorta al dibujo antes de escalar: usando el lienzo entero el
+# icono sale a la mitad de tamaño que los dibujados por código. Y se engrosa el
+# trazo, que de origen mide ~1% del lienzo y a este tamaño se ve pálido al lado
+# de los otros. Las dos cosas están pedidas en origen
+# (docs/iconografia-topp-create.md); esto es el apaño mientras llegan.
+DILATAR_TRAZO = 5
 
 DIR_DEJAVU = Path("/usr/share/fonts/truetype/dejavu")
 
@@ -410,10 +423,30 @@ ICONOS = {
 }
 
 
-def badge_relleno(draw, cx, cy, radio, paleta, icono):
-    """Círculo olivo con el icono en crema: el mismo badge de la tarjeta web."""
+def icono_de_marca(ruta, lado, color):
+    """Prepara un icono de la marca para pegarlo dentro de un badge."""
+    im = Image.open(ruta).convert("RGBA")
+    im = im.crop(im.getbbox())
+    alfa = im.getchannel("A").filter(ImageFilter.MaxFilter(DILATAR_TRAZO))
+    tinte = Image.new("RGBA", im.size, tuple(color) + (255,))
+    tinte.putalpha(alfa)
+    escala = lado / max(tinte.size)
+    return tinte.resize(
+        (max(1, round(tinte.width * escala)), max(1, round(tinte.height * escala))), Image.LANCZOS
+    )
+
+
+def badge_relleno(img, draw, cx, cy, radio, paleta, icono):
+    """Círculo relleno con el icono encima: el mismo badge de la tarjeta web."""
     draw.ellipse([cx - radio, cy - radio, cx + radio, cy + radio], fill=paleta["superficie"])
-    ICONOS[icono](draw, cx, cy, radio * 0.52, paleta["sobre_superficie"], 3)
+    ruta = ICONOS_MARCA.get(icono)
+    if ruta:
+        # Al mismo ancho que los dibujados por código (2 * radio * 0.52), para
+        # que la columna de badges no quede despareja.
+        ico = icono_de_marca(ruta, round(2 * radio * 0.52), paleta["sobre_superficie"])
+        img.alpha_composite(ico, (round(cx) - ico.width // 2, round(cy) - ico.height // 2))
+    else:
+        ICONOS[icono](draw, cx, cy, radio * 0.52, paleta["sobre_superficie"], 3)
 
 
 def badge_contorno(draw, cx, cy, radio, paleta, icono):
@@ -423,7 +456,7 @@ def badge_contorno(draw, cx, cy, radio, paleta, icono):
     ICONOS[icono](draw, cx, cy, radio * 0.50, paleta["texto_suave"], 3)
 
 
-def dibujar_seccion(draw, y, paleta, titulo, filas):
+def dibujar_seccion(img, draw, y, paleta, titulo, filas):
     """Sección con el mismo armado de la tarjeta web: título en versalitas con la
     regla fina a su derecha, y cada dato con su badge circular, etiqueta y valor."""
     fnt_titulo = fuente("semibold", 24)
@@ -450,7 +483,7 @@ def dibujar_seccion(draw, y, paleta, titulo, filas):
             draw.text((texto_x, y), linea, font=fnt_valor, fill=paleta["texto"])
             y += ALTO_VALOR if indice == 0 and len(lineas) == 1 else ALTO_LINEA_DIRECCION
 
-        badge_relleno(draw, MARGEN_X + BADGE_RADIO, (y_inicio + y) / 2 - 4, BADGE_RADIO, paleta, icono)
+        badge_relleno(img, draw, MARGEN_X + BADGE_RADIO, (y_inicio + y) / 2 - 4, BADGE_RADIO, paleta, icono)
 
         # Línea fina de separación, arrancando después del badge como en la web.
         if indice_fila < len(visibles) - 1:
@@ -583,7 +616,7 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     dos_correos = bool(persona.get("email")) and bool(marca.get("email"))
     dos_whatsapp = bool(persona.get("telefono_display")) and bool(marca.get("telefono_display"))
     y = dibujar_seccion(
-        draw, y, paleta, "Empresa",
+        img, draw, y, paleta, "Empresa",
         [
             # dibujar_seccion descarta las filas sin valor: lo que la persona no
             # publica, simplemente no aparece.
@@ -767,12 +800,20 @@ def main():
 
         # Misma tipografía que la tarjeta web, para que la imagen y la página no
         # se vean de dos marcas distintas.
-        global FUENTE_MARCA
+        global FUENTE_MARCA, ICONOS_MARCA
         ruta_fuente = ficha["assets"].get("fuente")
         FUENTE_MARCA = (ROOT / ruta_fuente) if ruta_fuente else None
         if FUENTE_MARCA and not FUENTE_MARCA.is_relative_to(ROOT):
             print(f"⚠ {slug}: la fuente queda fuera del repo, se ignora.")
             FUENTE_MARCA = None
+
+        ICONOS_MARCA = {}
+        for rol, relativa in (ficha["assets"].get("iconos") or {}).items():
+            ruta = (ROOT / relativa).resolve()
+            if ruta.is_relative_to(ROOT) and ruta.exists():
+                ICONOS_MARCA[rol] = ruta
+            else:
+                print(f"⚠ {slug}: el icono {rol} no aparece en {relativa}, se dibuja el genérico.")
 
         # El logo claro (sobre el bloque carbón) va en dist/{slug}/assets/ porque
         # la web también lo usa; el emblema (dentro del QR) y el plano en PNG

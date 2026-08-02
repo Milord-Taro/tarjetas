@@ -129,6 +129,14 @@ const ARTE_POR_TEMA = {
   },
 };
 
+// Iconos propios de la marca que reemplazan a los dibujados por código en la
+// imagen para WhatsApp. Van por tema, igual que la paleta de arte, para que la
+// v2 siga saliendo exactamente como estaba. Lo que no esté acá se sigue
+// dibujando con primitivas de PIL —hoy el sobre, porque no hay uno de marca—.
+const ICONOS_IMAGEN_POR_TEMA = {
+  v3: { whatsapp: 'contacto.png', ubicacion: 'ubicacion.png' },
+};
+
 const LOGOS_CANDIDATOS = [
   'logo-vertical-gris.png',
   'logo-horizontal-gris.png',
@@ -150,6 +158,21 @@ const ICONOS_CONTACTO = {
     whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.9-.9L3 20.5l1.5-4.9A8.4 8.4 0 0 1 12.6 3a8.4 8.4 0 0 1 8.4 8.5z"/><path d="M8.9 8.2c.2-.5.4-.5.7-.5h.5c.2 0 .4 0 .6.5l.7 1.6c.1.3 0 .5-.1.6l-.4.5c-.2.2-.2.3-.1.5a6 6 0 0 0 2.8 2.4c.2.1.4.1.5-.1l.5-.6c.2-.2.3-.2.6-.1l1.6.8c.3.1.4.3.4.5s0 .8-.3 1.1c-.3.4-.9.7-1.4.7-1 0-2.9-.7-4.4-2.2s-2.3-3.3-2.3-4.4c0-.6.3-1.1.6-1.3z"/></svg>',
     correo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3,6 12,13 21,6"/></svg>',
     ubicacion: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  },
+  // v3: los dos iconos propios de TOPP CREATE. El sobre sigue siendo el
+  // genérico —no hay uno de marca todavía—, por eso este set hereda el de la v2
+  // en vez de redefinirlo.
+  //
+  // El viewBox no es el lienzo de 150 del archivo original sino el recuadro del
+  // dibujo (lo declara su propio clipPath): dentro del lienzo el dibujo ocupa
+  // entre el 46% y el 62%, así que usándolo entero los iconos salían a la mitad
+  // de tamaño que el sobre. Y el trazo va en 5 y no en el 1–1.5 de origen:
+  // recortado al dibujo y visto a 31 px eso da ~2.2 px, que es justo lo que
+  // mide el trazo del sobre. Los dos ajustes están pedidos en origen
+  // (docs/iconografia-topp-create.md); esto es el apaño mientras llegan.
+  v3: {
+    whatsapp: '<svg viewBox="41 40 68.1 69.74" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M63.41 47.78C63.41 47.78 59.48 39.71 54.59 40.56C49.7 41.41 40.26 45.24 41.64 57.98C44.17 82.97 68.12 111.81 97.29 109.06C109.69 108.32 110.93 94.91 105.68 91.33C101.64 88.57 96.23 84.64 90.81 85.38C85.39 86.12 84.54 92.07 81.25 90.37C74.86 86.51 56.04 72.51 61.92 63.5C66.06 59.78 69.25 57.02 63.41 47.78Z"/></svg>',
+    ubicacion: '<svg viewBox="29 36 92.62 77.28" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M43.98 112.53V79.4L57.73 69C59.45 67.7 61.76 67.52 63.66 68.55L73.93 74.09V37.77L92.2 55.49V82.69L110.04 94.05V112.53"/><path d="M29.75 112.53H120.87"/><path d="M60.76 67.9V112.53"/><path d="M73.9301 67.9V112.53"/><path d="M92.1899 67.9V112.53"/></svg>',
   },
   v1: {
     whatsapp: '<svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
@@ -622,14 +645,14 @@ function valorHtml(fila) {
   return fila.valorHtml ?? escapeHtml(fila.valor);
 }
 
-function seccionesContactoHtmlV2(secciones) {
+function seccionesContactoHtmlV2(secciones, iconos = ICONOS_CONTACTO.v2) {
   return secciones
     .map((seccion) => {
       const filas = seccion.filas
         .map(
           (fila) =>
             `<li class="contacto${fila.esDireccion ? ' contacto--direccion' : ''}">\n` +
-            `            <span class="contacto__badge" aria-hidden="true">${ICONOS_CONTACTO.v2[fila.icono]}</span>\n` +
+            `            <span class="contacto__badge" aria-hidden="true">${iconos[fila.icono] ?? ICONOS_CONTACTO.v2[fila.icono]}</span>\n` +
             `            <span class="contacto__texto">\n` +
             `              <span class="contacto__etiqueta">${escapeHtml(fila.etiqueta)}</span>\n` +
             `              <a class="contacto__valor" href="${escapeHtml(fila.href)}"${atributosEnlace(fila)}>${valorHtml(fila)}</a>\n` +
@@ -830,6 +853,16 @@ for (const personaCruda of personas) {
   // porque generar_imagenes.py ya no lee data/ por su cuenta.
   const emblemaFile = archivoSeguro(logoDir, marca.logo_emblema, `${ctxArchivos} (logo_emblema)`);
   const fuente = resolverFuente(marca, logoDir, `${slug} → tipografía`);
+
+  // Iconos de marca para el PNG. Se comprueban contra la carpeta iconos/ de la
+  // marca; el que no aparezca se dibuja con primitivas, como siempre.
+  const iconosDir = path.join(logoDir, 'iconos');
+  const iconosMarca = Object.fromEntries(
+    Object.entries(ICONOS_IMAGEN_POR_TEMA[temaActivo] ?? {})
+      .map(([rol, archivo]) => [rol, archivoSeguro(iconosDir, archivo, `${slug} → icono ${rol}`)])
+      .filter(([, archivo]) => archivo)
+      .map(([rol, archivo]) => [rol, path.relative(ROOT, path.join(iconosDir, archivo))])
+  );
   const fondoPlanoPngFile = archivoSeguro(logoDir, marca.fondo_plano_png, `${ctxArchivos} (fondo_plano_png)`);
 
   const nombrePartido = partirNombre(persona);
@@ -897,6 +930,7 @@ for (const personaCruda of personas) {
   const contactosHtmlPorTema = {
     v1: seccionesContactoHtmlV1(seccionesDeContacto),
     v2: seccionesContactoHtmlV2(seccionesDeContacto),
+    v3: seccionesContactoHtmlV2(seccionesDeContacto, { ...ICONOS_CONTACTO.v2, ...ICONOS_CONTACTO.v3 }),
   };
   valoresBase['marca.tagline_html'] = taglineHtml(marca.tagline);
   valoresBase['marca.direccion_html'] = direccionAHtml(marca.direccion);
@@ -1015,6 +1049,7 @@ for (const personaCruda of personas) {
       logo_claro: logoClaroFile,
       logo_emblema: emblemaFile,
       fuente: fuente.origen ? path.relative(ROOT, fuente.origen) : null,
+      iconos: iconosMarca,
       fondo_plano_png: fondoPlanoPngFile,
     },
   });

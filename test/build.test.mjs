@@ -240,6 +240,37 @@ test('la paleta de arte del manifiesto sigue al tema activo', () => {
   assert.equal(conV3.cuna, '#C8C1B8', 'con v3 la cuña es el apoyo del manual');
 });
 
+test('los iconos de marca son de la v3 y no se cuelan en la v2', () => {
+  // Hacen falta las cuatro filas de contacto para que existan los cuatro badges.
+  const conContacto = [
+    { ...MARCAS[0], whatsapp: '573000000000', email: 'info@x.test', direccion: ['Calle 1'] },
+  ];
+  const persona = ficha({ email: 'ana@x.test' });
+  const badges = (html) =>
+    [...html.matchAll(/contacto__badge"[^>]*><svg viewBox="([^"]+)"/g)].map((m) => m[1]);
+
+  const conV3 = compilar([persona], { marcas: conContacto, config: { ...CONFIG, tema: 'v3' } });
+  // El teléfono y los edificios de TOPP se reconocen por su viewBox, que es el
+  // recuadro del dibujo y no el lienzo de 150 del archivo original. En medio,
+  // los dos correos siguen con el sobre genérico: no hay uno de marca todavía.
+  assert.deepEqual(badges(readFileSync(path.join(conV3.dist, 'ana-perez', 'index.html'), 'utf8')), [
+    '41 40 68.1 69.74',
+    '0 0 24 24',
+    '0 0 24 24',
+    '29 36 92.62 77.28',
+  ]);
+  assert.deepEqual(
+    Object.keys(leerManifiesto(conV3.raiz).personas[0].assets.iconos),
+    ['whatsapp', 'ubicacion']
+  );
+
+  const conV2 = compilar([persona], { marcas: conContacto, config: { ...CONFIG, tema: 'v2' } });
+  const v2Badges = badges(readFileSync(path.join(conV2.dist, 'ana-perez', 'index.html'), 'utf8'));
+  assert.deepEqual(v2Badges, ['0 0 24 24', '0 0 24 24', '0 0 24 24', '0 0 24 24'],
+    'la v2 se queda con los cuatro iconos genéricos');
+  assert.deepEqual(leerManifiesto(conV2.raiz).personas[0].assets.iconos, {});
+});
+
 test('poda los archivos que sobran dentro de una tarjeta activa', () => {
   const { dist, raiz } = compilar([ficha({})]);
 
