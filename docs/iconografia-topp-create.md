@@ -15,15 +15,20 @@ versiones en imagen fija, y las vectoriales se pueden ampliar a cualquier tamañ
 
 Con los iconos hay un problema y dos huecos.
 
-**El problema:** están dibujados con una línea muy fina, pensada para verse
-grandes. En la tarjeta digital cada icono ocupa unos 32 píxeles —más o menos el
-tamaño de una letra mayúscula— y a ese tamaño la línea desaparece. En el anexo
-se ve el mismo archivo grande y pequeño: el de edificios, por ejemplo, se
-convierte en una mancha.
+**El problema son dos cosas pequeñas, ninguna grave:**
 
-No es que estén mal dibujados. Es que están dibujados para un tamaño y se
-necesitan para otro. **La buena noticia es que no hay que rehacerlos: basta con
-volver a exportarlos con la línea más gruesa.** Es un ajuste de minutos por
+1. **Cada icono ocupa una porción distinta de su lienzo.** El del teléfono llena
+   el 46 % del cuadro y el de edificios el 62 %. Como el programa los coloca por
+   el cuadro y no por el dibujo, unos salen grandes y otros pequeños sin que
+   nadie lo haya decidido. Se ve en el punto A del anexo.
+2. **La línea es algo fina para el tamaño de uso.** En la tarjeta cada icono
+   mide unos 31 píxeles —el tamaño de una letra mayúscula—. A esa medida se
+   reconocen los siete, pero se ven más pálidos que un icono corriente puesto al
+   lado. En el punto B del anexo están los mismos siete antes y después de
+   engrosar la línea.
+
+**No hay que rehacerlos.** Son dos ajustes de exportación: igualar cuánto ocupa
+el dibujo dentro del cuadro, y duplicar el grosor de la línea. Minutos por
 icono, no un rediseño.
 
 **Los dos huecos:**
@@ -44,18 +49,28 @@ iconografía propia y el set sirve también para la web y las propuestas.
 
 ## 2. Qué está pasando, con el detalle
 
-### La línea es demasiado fina para el tamaño de uso
+### El dibujo no ocupa lo mismo en todos los lienzos
 
-Los iconos vienen dibujados sobre un lienzo de 150 × 150 con un grosor de línea
-de 1 a 1,5. Eso es aproximadamente **el 1 % del alto del icono**.
+Los siete vienen sobre un lienzo de 150 × 150, pero el dibujo dentro ocupa una
+parte distinta en cada uno: 46 % de ancho en `contacto`, 62 % en `ubicacion`.
 
-En la tarjeta se usan a 32 píxeles. A ese tamaño, ese 1 % equivale a **menos de
-medio píxel de grosor**: la pantalla no puede dibujar media línea, así que la
-difumina hasta que casi desaparece.
+Quien coloca los iconos lo hace por el lienzo, porque es lo único que el archivo
+declara. El resultado es que puestos en fila unos se ven grandes y otros
+pequeños, sin ninguna intención detrás. Se arregla dejando siempre el mismo
+margen entre el dibujo y el borde del lienzo.
 
-Ya se probó engrosando la línea artificialmente y **todos vuelven a leerse
-bien**, incluidos los de edificios y grúa, que eran los peores. Por eso la
-recomendación es re-exportar y no rediseñar.
+### La línea es algo fina para el tamaño de uso
+
+El grosor es de 1 a 1,5 sobre el lienzo de 150 — alrededor del **1 % del alto**.
+Para comparar: un icono de interfaz corriente ronda el 6 %.
+
+Encuadrados correctamente y a 31 píxeles **los siete se reconocen**, así que el
+problema es menor de lo que parecía en una primera prueba. Lo que sí pasa es que
+se ven notoriamente más pálidos que los iconos corrientes que están usándose hoy
+en la tarjeta, y al mezclarlos la fila queda despareja.
+
+Se probó duplicando el grosor y quedan emparejados. Con eso basta: no hace falta
+llegar al 6 % ni cambiar el estilo fino, que es parte del carácter de la marca.
 
 ### Los iconos traen un fondo blanco pegado
 
@@ -97,16 +112,18 @@ Servicios, Ubicación.
 
 | # | Corrección | Detalle |
 |---|---|---|
-| 1 | **Engrosar la línea** | Del 1 % actual al **2–3 % del alto del icono**. Sobre el lienzo de 150 que ya usan, eso es un grosor de **3 a 4,5**. |
-| 2 | **Mismo grosor en todos** | Hoy hay 1, 1,5 y una mezcla. Que los siete usen exactamente el mismo valor. |
-| 3 | **Quitar el fondo blanco** | Sin el `<rect fill="white">`. El fondo debe quedar transparente. |
-| 4 | **Color heredable** | Que la línea use `currentColor` en vez de `#1D1D1B`. Si la herramienta no lo permite, entregar dos versiones: una oscura y una clara. |
-| 5 | **Nombres normalizados** | Minúscula, sin tildes, sin espacios: `ubicacion.svg`, no `Ubicación.svg`. |
-| 6 | **Carpetas bien rotuladas** | Si dice `JPG`, que sean JPG. Si son PNG a otra resolución, que la carpeta lo diga (`PNG@2x`). |
-| 7 | **`Servicios` unificado** | Que sea solo línea, como los otros seis, y no una mezcla de relleno y línea. |
+| 1 | **Igualar el encuadre** | Que el dibujo ocupe la misma proporción del lienzo en los siete, dejando el mismo margen al borde (≈8 % del lienzo). Hoy va del 46 % al 62 %. |
+| 2 | **Duplicar el grosor de línea** | De 1–1,5 a **2,5–3** sobre el lienzo de 150. No más: el trazo fino es parte del carácter de la marca, solo hay que emparejarlo con el resto de la interfaz. |
+| 3 | **Mismo grosor en todos** | Hoy hay 1, 1,5 y una mezcla. Que los siete usen exactamente el mismo valor. |
+| 4 | **Quitar el fondo blanco** | Sin el `<rect fill="white">`. El fondo debe quedar transparente. |
+| 5 | **Color heredable** | Que la línea use `currentColor` en vez de `#1D1D1B`. Si la herramienta no lo permite, entregar dos versiones: una oscura y una clara. |
+| 6 | **Nombres normalizados** | Minúscula, sin tildes, sin espacios: `ubicacion.svg`, no `Ubicación.svg`. |
+| 7 | **Carpetas bien rotuladas** | Si dice `JPG`, que sean JPG. Si son PNG a otra resolución, que la carpeta lo diga (`PNG@2x`). |
+| 8 | **`Servicios` unificado** | Que sea solo línea, como los otros seis, y no una mezcla de relleno y línea. |
 
-**Cómo comprobarlo antes de entregar:** poner el icono a 32 píxeles en pantalla
-y mirarlo. Si a ese tamaño no se reconoce de un vistazo, todavía no está listo.
+**Cómo comprobarlo antes de entregar:** poner los siete en fila a 31 píxeles.
+Si alguno se reconoce peor que sus vecinos, o pesa visiblemente más o menos que
+ellos, todavía no está listo.
 
 ---
 
@@ -163,9 +180,11 @@ Un checklist para que la siguiente tanda entre directo, sin retoques.
 **Construcción**
 
 - Lienzo cuadrado, mismo tamaño para todos.
+- **El dibujo debe ocupar la misma proporción del lienzo en todos.** Es el
+  detalle que más descuadra un set y el más fácil de pasar por alto.
 - Todos los iconos ópticamente del mismo peso: que ninguno se vea más oscuro o
   más cargado que sus vecinos puestos en fila.
-- Grosor de línea entre el 2 % y el 3 % del alto del lienzo, idéntico en todos.
+- Grosor de línea alrededor del 2 % del alto del lienzo, idéntico en todos.
 - Terminaciones y uniones de línea redondeadas, iguales en todo el set.
 - Un margen interior de aproximadamente el 8 % del lienzo, para que al ponerlos
   dentro de un círculo no queden pegados al borde.
