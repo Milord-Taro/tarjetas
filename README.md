@@ -286,6 +286,49 @@ la distinción hay que hacerla por valor — funciona porque es texto grande, a
 3.04:1—; y el **texto pequeño** va en Grafito y nunca en Gris Piedra, que sobre
 marfil no llega al 4.5:1 que pide AA.
 
+### Resolución de la imagen para WhatsApp
+
+El arte está escrito sobre un lienzo **lógico** de 1080×2000 y ese número no
+cambia: es el sistema de coordenadas del diseño. Lo que decide el archivo son
+dos constantes al principio de `generar_imagenes.py`:
+
+| Constante | Hoy | Qué hace |
+|---|---|---|
+| `ESCALA_SALIDA` | 2 | píxeles reales por píxel de diseño → el archivo sale en **2160×4000** |
+| `SUPERMUESTREO` | 2 | se dibuja al doble de eso y se reduce: eso es el antialiasing |
+
+Las dos resuelven problemas distintos y por eso son dos y no una.
+
+**`ESCALA_SALIDA` es resolución.** A 1080 de ancho la pieza quedaba por debajo
+de casi cualquier pantalla donde se mira: un monitor de 1080p tiene que
+encogerla para que quepan los 2000 px de alto, y una 2K o un teléfono moderno la
+amplían. Ampliar un mapa de bits siempre emborrona. El techo son estos 2× y lo
+pone el logo: `logo-vertical-blanco.png` mide 461×372 y a 2× se dibuja a
+400×324, todavía una reducción. A 3× habría que ampliarlo y saldría peor.
+
+**`SUPERMUESTREO` es suavizado.** `ImageDraw` no suaviza nada de lo que dibuja
+—ni líneas, ni rectángulos, ni elipses, ni polígonos—, así que el sobre del
+correo, los arcos del pin y el borde de cada badge salían con el filo en
+escalera. Se notaba sobre todo al lado de los iconos propios de TOPP, que vienen
+de un PNG y sí llegan suavizados. Dibujando al doble y reduciendo, cada píxel
+final es el promedio de cuatro.
+
+Tres piezas **no** pasan por la reducción y se componen al final, en su tamaño
+exacto (`Lienzo.pegar_al_final`): los **QR**, porque un módulo promediado deja
+de leerse; el **logo** y los **iconos de la marca**, porque traen su propia
+resolución y remuestrearlos dos veces —estirar al lienzo grande y volver a
+reducir— los ablanda sin ganar nada. El plano de fondo sí pasa por ahí, porque
+tiene que quedar debajo del texto y con su 5% de opacidad da igual.
+
+Al subir la escala hay un detalle que muerde: los topes de «no ampliar» hay que
+medirlos contra el archivo final (`_pxf`) y no contra el lienzo de dibujo
+(`_px`). Con el lienzo, el `min(..., 1)` del logo saltaba antes de tiempo y lo
+dibujaba a la mitad de lo que le toca.
+
+El coste es el peso: la pieza pasó de ~280 KB a ~970 KB. Sin importancia frente
+al límite de WhatsApp, pero conviene saber que **WhatsApp recomprime lo que se
+manda como foto**; para que llegue tal cual hay que enviarla como *documento*.
+
 Para sacar una maqueta de un tema sin tocar lo publicado:
 
 ```bash
@@ -359,14 +402,16 @@ cercano. Si se interpolan, los bordes quedan difusos y dejan de leerse apenas la
 imagen se ve pequeña.
 
 Lo que decide si un QR se escanea desde una pantalla no es la resolución del
-archivo sino cuántos píxeles mide cada módulo cuando la imagen se ve completa:
-al abrir una imagen de 1080×2000 en un monitor de 1080p se muestra a la mitad,
-así que un módulo de 4px queda en 2 y la cámara no lo resuelve. Por eso los dos
-QR usan corrección Q en vez de H (menos corrección → menos módulos → módulos más
-grandes) y ocupan `QR_TAMANO = 360`: quedan en 4px por módulo en pantalla, el
-doble que antes. Si se agranda el QR o se alarga la URL hay que revisar que la
-cuenta siga dando — el script avisa si el bloque invade el pie, pero no si los
-módulos quedaron muy finos.
+archivo sino cuántos píxeles mide cada módulo **cuando la imagen se ve
+completa**. Subir `ESCALA_SALIDA` no ayuda en esto: la pieza se sigue viendo del
+mismo tamaño físico, solo que con más píxeles por módulo en el archivo y la
+misma cantidad en la pantalla. Los dos QR ocupan `QR_TAMANO = 360` del lienzo
+lógico y usan corrección Q en vez de H (menos corrección → menos módulos →
+módulos más grandes): con la URL de hoy salen a 41 módulos, 16 px por módulo en
+el archivo y ~4 en un monitor de 1080p que muestra la tarjeta entera. Si se
+agranda el QR o se alarga la URL hay que revisar que la cuenta siga dando — el
+script avisa si el bloque invade el pie, pero no si los módulos quedaron muy
+finos.
 
 ## Cómo ver las tarjetas
 

@@ -54,9 +54,47 @@ ARTE_RESPALDO = {
     "qr_fondo": "#FFFFFF",
 }
 
+# ── Resolución ───────────────────────────────────────────────────────────────
+# Todo el arte de aquí abajo está escrito sobre un lienzo LÓGICO de 1080x2000.
+# Ese número no cambia: es el sistema de coordenadas del diseño. Lo que cambia
+# es a cuántos píxeles reales se traduce.
+#
+# ESCALA_SALIDA: cuántos píxeles reales mide un píxel de diseño en el archivo
+#   final. Con 2, la pieza sale en 2160x4000. Se subió de 1 porque a 1080 de
+#   ancho la imagen queda por debajo de casi cualquier pantalla donde se mira:
+#   un monitor de 1080p tiene que encogerla para que quepan los 2000 px de alto,
+#   y una pantalla 2K o un teléfono moderno la agrandan. Ampliar un mapa de bits
+#   siempre emborrona; reducirlo, no. El techo son estos 2x y lo pone el logo:
+#   logo-vertical-blanco.png mide 461x372 y a 2x se dibuja a 400x324, todavía
+#   una reducción. A 3x habría que ampliarlo y el logo saldría peor, no mejor.
+#
+# SUPERMUESTREO: cuántas veces más grande se dibuja antes de reducir al tamaño
+#   final. Esto no es resolución, es antialiasing. ImageDraw no suaviza NADA de
+#   lo que dibuja —ni líneas, ni rectángulos, ni elipses, ni polígonos—, así que
+#   el sobre del correo, los arcos del pin de ubicación y el borde de cada badge
+#   salían con el filo en escalera. Dibujando al doble y reduciendo, cada píxel
+#   final es el promedio de 4, que es exactamente el suavizado que falta. El
+#   texto sí lo suaviza FreeType, pero también gana al reducir.
+#
+# Los QR son la excepción y se pegan DESPUÉS de reducir (ver más abajo): un QR
+# promediado deja de ser legible.
+ESCALA_SALIDA = 2
+SUPERMUESTREO = 2
+ESCALA_RENDER = ESCALA_SALIDA * SUPERMUESTREO
+
 WIDTH, HEIGHT = 1080, 2000
 MARGEN_X = 96
 ANCHO_UTIL = WIDTH - 2 * MARGEN_X
+
+
+def _px(valor):
+    """Coordenada de diseño → píxel del lienzo grande, donde se dibuja."""
+    return round(valor * ESCALA_RENDER)
+
+
+def _pxf(valor):
+    """Coordenada de diseño → píxel del archivo final, ya reducido."""
+    return round(valor * ESCALA_SALIDA)
 
 # Cabecera: la cuña lleva un corte diagonal simple y el bloque que va encima
 # lleva un corte en chevron con el vértice al 20% del ancho — por eso la franja
@@ -154,7 +192,13 @@ def hex_a_rgb(color_hex):
 
 
 def fuente(peso, tamano):
-    """peso: 'bold' | 'semibold' | 'medium' | 'regular' | 'light'."""
+    """peso: 'bold' | 'semibold' | 'medium' | 'regular' | 'light'.
+
+    El tamaño se pide en píxeles de diseño y se pasa a píxeles reales aquí, en
+    un solo sitio: así el arte se sigue escribiendo con los cuerpos de siempre
+    (60 para el nombre, 30 para un valor) sin enterarse de la resolución."""
+    tamano = max(1, round(tamano * ESCALA_RENDER))
+
     # 1) La tipografía de la marca. Si es variable, un solo archivo cubre todos
     # los pesos; si es estática, set_variation_by_axes falla y se usa tal cual
     # (el peso lo dará la variante que la marca haya puesto en el archivo).
@@ -173,6 +217,93 @@ def fuente(peso, tamano):
     if ruta_dejavu.exists():
         return ImageFont.truetype(str(ruta_dejavu), tamano)
     return ImageFont.load_default()
+
+
+class Lienzo:
+    """El lienzo grande donde se dibuja, más lo que se compone al final.
+
+    Un mapa de bits pegado en el lienzo grande pasa por dos remuestreos: primero
+    se estira hasta la escala de dibujo y después la reducción de supermuestreo
+    se lo vuelve a comer. Los archivos que traen su propia resolución —el logo,
+    los iconos de la marca, los QR— se apartan aquí y se componen ya sobre la
+    imagen final, con un único redimensionado y en su tamaño exacto.
+
+    Solo vale para lo que va ENCIMA de todo. El plano de fondo no pasa por aquí
+    porque tiene que quedar debajo del texto (y con su 5% de opacidad, lo que
+    pierda al remuestrear no se ve).
+    """
+
+    def __init__(self, imagen):
+        self.imagen = imagen
+        self.encima = []
+
+    def pegar_al_final(self, im, xy):
+        """xy en píxeles del ARCHIVO FINAL, no del lienzo de dibujo."""
+        self.encima.append((im, xy))
+
+    def componer(self, final):
+        for im, xy in self.encima:
+            final.paste(im, xy, im if im.mode == "RGBA" else None)
+        return final
+
+
+class DibujoEscalado:
+    """ImageDraw con la escala metida en medio.
+
+    Todo el arte llama a este objeto con coordenadas del lienzo lógico de
+    1080x2000 y él las lleva al lienzo real, que es ESCALA_RENDER veces mayor.
+    La alternativa era multiplicar a mano en cada una de las ~40 llamadas de
+    dibujo del archivo, incluidos los números sueltos (`width=5`, `r * 0.72`),
+    y cualquiera que se olvidara descuadraba la pieza en silencio.
+
+    textlength devuelve la medida DIVIDIDA por la escala, de vuelta a unidades
+    de diseño: la fuente ya se creó en píxeles reales, y si no se deshiciera la
+    conversión aquí, todo el centrado y el ajuste de línea saldrían del lienzo.
+    """
+
+    def __init__(self, draw, factor):
+        self._d = draw
+        self._f = factor
+
+    def _xy(self, xy):
+        """Acepta las tres formas que usa PIL: un punto, una lista de puntos o
+        una caja plana de cuatro números."""
+        f = self._f
+        if isinstance(xy[0], (list, tuple)):
+            return [tuple(v * f for v in punto) for punto in xy]
+        return [v * f for v in xy]
+
+    def _grosor(self, ancho):
+        # Nunca por debajo de 1: una regla fina tiene que seguir viéndose.
+        return max(1, round(ancho * self._f))
+
+    def text(self, xy, texto, **kw):
+        self._d.text(self._xy(xy), texto, **kw)
+
+    def textlength(self, texto, **kw):
+        return self._d.textlength(texto, **kw) / self._f
+
+    def line(self, xy, fill=None, width=1, **kw):
+        self._d.line(self._xy(xy), fill=fill, width=self._grosor(width), **kw)
+
+    def polygon(self, xy, **kw):
+        self._d.polygon(self._xy(xy), **kw)
+
+    def ellipse(self, xy, fill=None, outline=None, width=1):
+        self._d.ellipse(self._xy(xy), fill=fill, outline=outline, width=self._grosor(width))
+
+    def arc(self, xy, start, end, fill=None, width=1):
+        # Los ángulos no se escalan, solo la caja.
+        self._d.arc(self._xy(xy), start, end, fill=fill, width=self._grosor(width))
+
+    def rectangle(self, xy, fill=None, outline=None, width=1):
+        self._d.rectangle(self._xy(xy), fill=fill, outline=outline, width=self._grosor(width))
+
+    def rounded_rectangle(self, xy, radius=0, fill=None, outline=None, width=1):
+        self._d.rounded_rectangle(
+            self._xy(xy), radius=radius * self._f, fill=fill, outline=outline,
+            width=self._grosor(width),
+        )
 
 
 def ancho_espaciado(draw, texto, fnt, espaciado):
@@ -226,7 +357,7 @@ def envolver_texto(draw, texto, fnt, ancho_max):
     return lineas
 
 
-def dibujar_cabecera(img, draw, paleta, logo_path, marca):
+def dibujar_cabecera(lienzo, draw, paleta, logo_path, marca):
     """Cabecera: cuña con corte diagonal simple y, encima, el bloque con corte
     en chevron. Las proporciones son las mismas del CSS (0.9 / 0.25 / 0.52 de la
     profundidad total)."""
@@ -253,12 +384,19 @@ def dibujar_cabecera(img, draw, paleta, logo_path, marca):
     y_fin_logo = LOGO_TOP + LOGO_MAX_H
     if logo_path and logo_path.exists():
         logo = Image.open(logo_path).convert("RGBA")
-        escala = min(LOGO_MAX_W / logo.width, LOGO_MAX_H / logo.height, 1)
-        logo = logo.resize((max(1, int(logo.width * escala)), max(1, int(logo.height * escala))), Image.LANCZOS)
-        x = (WIDTH - logo.width) // 2
-        y = LOGO_TOP + (LOGO_MAX_H - logo.height) // 2
-        img.paste(logo, (x, y), logo)
-        y_fin_logo = y + logo.height
+        # La caja se mide en píxeles del archivo final: así el tope de "no
+        # ampliar" se aplica contra lo que de verdad se va a ver. Con la caja del
+        # lienzo de dibujo, que es el doble, el tope saltaba antes de tiempo y el
+        # logo salía a la mitad del tamaño que le toca.
+        caja_w, caja_h = _pxf(LOGO_MAX_W), _pxf(LOGO_MAX_H)
+        escala = min(caja_w / logo.width, caja_h / logo.height, 1)
+        logo = logo.resize(
+            (max(1, round(logo.width * escala)), max(1, round(logo.height * escala))), Image.LANCZOS
+        )
+        x = (_pxf(WIDTH) - logo.width) // 2
+        y = _pxf(LOGO_TOP) + (caja_h - logo.height) // 2
+        lienzo.pegar_al_final(logo, (x, y))
+        y_fin_logo = (y + logo.height) / ESCALA_SALIDA
     else:
         fnt = fuente("semibold", 46)
         texto = marca.get("nombre", "").upper()
@@ -290,18 +428,19 @@ def dibujar_fondo_plano(img, plano, y_top, y_fin):
     que usa la tarjeta web (lo genera scripts/generar_planos.py)."""
     if not plano or not plano.exists():
         return
-    alto_zona = y_fin - y_top
+    ancho = _px(WIDTH)
+    alto_zona = _px(y_fin) - _px(y_top)
     dibujo = Image.open(plano).convert("RGBA")
     # Se ajusta al ancho y se repite en vertical, igual que en el CSS: escalado
     # para cubrir dejaría el trazo demasiado grueso frente al texto.
-    escala = WIDTH / dibujo.width
-    dibujo = dibujo.resize((WIDTH, max(1, int(dibujo.height * escala))), Image.LANCZOS)
+    escala = ancho / dibujo.width
+    dibujo = dibujo.resize((ancho, max(1, round(dibujo.height * escala))), Image.LANCZOS)
     dibujo.putalpha(dibujo.getchannel("A").point(lambda v: int(v * 0.05)))
 
-    franja = Image.new("RGBA", (WIDTH, alto_zona), (0, 0, 0, 0))
+    franja = Image.new("RGBA", (ancho, alto_zona), (0, 0, 0, 0))
     for desplazamiento in range(0, alto_zona, dibujo.height):
         franja.alpha_composite(dibujo, (0, desplazamiento))
-    img.alpha_composite(franja, (0, y_top))
+    img.alpha_composite(franja, (0, _px(y_top)))
 
 
 def dibujar_identidad(draw, y, paleta, persona):
@@ -436,15 +575,15 @@ def icono_de_marca(ruta, lado, color):
     )
 
 
-def badge_relleno(img, draw, cx, cy, radio, paleta, icono):
+def badge_relleno(lienzo, draw, cx, cy, radio, paleta, icono):
     """Círculo relleno con el icono encima: el mismo badge de la tarjeta web."""
     draw.ellipse([cx - radio, cy - radio, cx + radio, cy + radio], fill=paleta["superficie"])
     ruta = ICONOS_MARCA.get(icono)
     if ruta:
         # Al mismo ancho que los dibujados por código (2 * radio * 0.52), para
         # que la columna de badges no quede despareja.
-        ico = icono_de_marca(ruta, round(2 * radio * 0.52), paleta["sobre_superficie"])
-        img.alpha_composite(ico, (round(cx) - ico.width // 2, round(cy) - ico.height // 2))
+        ico = icono_de_marca(ruta, _pxf(2 * radio * 0.52), paleta["sobre_superficie"])
+        lienzo.pegar_al_final(ico, (_pxf(cx) - ico.width // 2, _pxf(cy) - ico.height // 2))
     else:
         ICONOS[icono](draw, cx, cy, radio * 0.52, paleta["sobre_superficie"], 3)
 
@@ -456,7 +595,7 @@ def badge_contorno(draw, cx, cy, radio, paleta, icono):
     ICONOS[icono](draw, cx, cy, radio * 0.50, paleta["texto_suave"], 3)
 
 
-def dibujar_seccion(img, draw, y, paleta, titulo, filas):
+def dibujar_seccion(lienzo, draw, y, paleta, titulo, filas):
     """Sección con el mismo armado de la tarjeta web: título en versalitas con la
     regla fina a su derecha, y cada dato con su badge circular, etiqueta y valor."""
     fnt_titulo = fuente("semibold", 24)
@@ -483,7 +622,7 @@ def dibujar_seccion(img, draw, y, paleta, titulo, filas):
             draw.text((texto_x, y), linea, font=fnt_valor, fill=paleta["texto"])
             y += ALTO_VALOR if indice == 0 and len(lineas) == 1 else ALTO_LINEA_DIRECCION
 
-        badge_relleno(img, draw, MARGEN_X + BADGE_RADIO, (y_inicio + y) / 2 - 4, BADGE_RADIO, paleta, icono)
+        badge_relleno(lienzo, draw, MARGEN_X + BADGE_RADIO, (y_inicio + y) / 2 - 4, BADGE_RADIO, paleta, icono)
 
         # Línea fina de separación, arrancando después del badge como en la web.
         if indice_fila < len(visibles) - 1:
@@ -584,24 +723,34 @@ def igualar_qr(codigos, color_back):
     return iguales
 
 
-def dibujar_qr_enmarcado(img, draw, x, y, qr, paleta, lado_marco):
-    """Marco carbón redondeado con el QR centrado. El QR ya viene al tamaño
-    exacto que le tocó al escalar por módulos, así que se centra en el marco en
-    vez de forzarlo a una medida fija."""
+def dibujar_qr_enmarcado(draw, x, y, qr, paleta, lado_marco):
+    """Dibuja el marco carbón redondeado y devuelve dónde va a ir el QR.
+
+    El QR no se pega aquí. Todo lo demás de la tarjeta se dibuja a lo grande y
+    luego se reduce para suavizarlo, y un QR reducido con cualquier filtro deja
+    de leerse: los bordes de módulo se vuelven degradados y la cámara pierde la
+    rejilla. Así que este devuelve la posición en píxeles del ARCHIVO FINAL y
+    generar_tarjeta_whatsapp lo pega después de reducir, intacto.
+    """
     draw.rounded_rectangle(
         [x, y, x + lado_marco, y + lado_marco], radius=QR_MARCO_RADIO, fill=paleta["marco_qr"]
     )
-    desfase = (lado_marco - qr.width) // 2
-    img.paste(qr, (x + desfase, y + desfase))
+    # El QR ya viene al tamaño exacto que le tocó al escalar por módulos, así que
+    # se centra en el marco en vez de forzarlo a una medida fija.
+    desfase = (round(lado_marco * ESCALA_SALIDA) - qr.width) // 2
+    return (round(x * ESCALA_SALIDA) + desfase, round(y * ESCALA_SALIDA) + desfase)
 
 
 def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano, url_publica, salida):
+    # El lienzo real es ESCALA_RENDER veces el lógico; el arte de aquí abajo no
+    # se entera, porque las coordenadas pasan por DibujoEscalado.
     # RGBA porque la marca de agua se compone con transparencia; al guardar se
     # aplana a RGB.
-    img = Image.new("RGBA", (WIDTH, HEIGHT), paleta["lienzo"] + (255,))
-    draw = ImageDraw.Draw(img)
+    img = Image.new("RGBA", (_px(WIDTH), _px(HEIGHT)), paleta["lienzo"] + (255,))
+    lienzo = Lienzo(img)
+    draw = DibujoEscalado(ImageDraw.Draw(img), ESCALA_RENDER)
 
-    dibujar_cabecera(img, draw, paleta, logo_claro, marca)
+    dibujar_cabecera(lienzo, draw, paleta, logo_claro, marca)
     dibujar_fondo_plano(img, plano, CABECERA_BASE - 34, HEIGHT - PIE_ALTO)
 
     y = dibujar_identidad(draw, NOMBRE_TOP, paleta, persona)
@@ -616,7 +765,7 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     dos_correos = bool(persona.get("email")) and bool(marca.get("email"))
     dos_whatsapp = bool(persona.get("telefono_display")) and bool(marca.get("telefono_display"))
     y = dibujar_seccion(
-        img, draw, y, paleta, "Empresa",
+        lienzo, draw, y, paleta, "Empresa",
         [
             # dibujar_seccion descarta las filas sin valor: lo que la persona no
             # publica, simplemente no aparece.
@@ -686,23 +835,28 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     # simplemente viaja con más relleno, que no afecta la lectura.
     version = max(version_qr(datos_contacto), version_qr(url_publica))
 
+    # Se piden al tamaño del archivo FINAL, no al del lienzo de dibujo: estos dos
+    # no pasan por la reducción de supermuestreo.
+    objetivo_qr = QR_TAMANO * ESCALA_SALIDA
     qr_contacto = generar_qr(
-        datos_contacto, paleta["qr_modulo"], paleta["qr_fondo"], emblema, QR_TAMANO, version
+        datos_contacto, paleta["qr_modulo"], paleta["qr_fondo"], emblema, objetivo_qr, version
     )
-    qr_tarjeta = generar_qr(url_publica, paleta["qr_modulo"], paleta["qr_fondo"], None, QR_TAMANO, version)
+    qr_tarjeta = generar_qr(url_publica, paleta["qr_modulo"], paleta["qr_fondo"], None, objetivo_qr, version)
 
     # Red de seguridad por si alguna vez vuelven a diferir (otro contenido, otra
     # marca): antes de enmarcarlos se igualan los lados.
     qr_contacto, qr_tarjeta = igualar_qr([qr_contacto, qr_tarjeta], paleta["qr_fondo"])
 
-    lado_marco = qr_contacto.width + 2 * QR_MARCO_PAD
+    # El QR mide lo que le tocó al escalar por módulos; el marco se calcula desde
+    # ahí, de vuelta a unidades de diseño para colocarlo con el resto del arte.
+    lado_marco = qr_contacto.width / ESCALA_SALIDA + 2 * QR_MARCO_PAD
     # Tres huecos iguales: costado, centro, costado.
     hueco = (WIDTH - 2 * lado_marco) / 3
     x_izq = int(hueco)
     x_der = int(2 * hueco + lado_marco)
 
-    dibujar_qr_enmarcado(img, draw, x_izq, qr_top, qr_contacto, paleta, lado_marco)
-    dibujar_qr_enmarcado(img, draw, x_der, qr_top, qr_tarjeta, paleta, lado_marco)
+    for x, qr in ((x_izq, qr_contacto), (x_der, qr_tarjeta)):
+        lienzo.pegar_al_final(qr, dibujar_qr_enmarcado(draw, x, qr_top, qr, paleta, lado_marco))
 
     fnt_caption = fuente("medium", 26)
     caption_y = qr_top + lado_marco + 22
@@ -738,7 +892,14 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     if fin_contenido > pie_top:
         print(f"    ⚠ el contenido ({fin_contenido}px) invade el pie ({pie_top}px)")
 
-    img.convert("RGB").save(salida)
+    # Reducción al tamaño final: aquí es donde el supermuestreo se convierte en
+    # antialiasing. LANCZOS y no BOX porque, a una razón entera, conserva algo de
+    # filo en el texto en vez de dejarlo solo promediado.
+    final = img.convert("RGB")
+    if SUPERMUESTREO > 1:
+        final = final.resize((WIDTH * ESCALA_SALIDA, HEIGHT * ESCALA_SALIDA), Image.LANCZOS)
+
+    lienzo.componer(final).save(salida)
 
 
 def paleta_de(ficha):

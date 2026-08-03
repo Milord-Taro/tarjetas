@@ -118,9 +118,12 @@ def paleta_de_marca():
 
 
 def componer(tarjetas, paleta, medido, salida):
-    escala = 0.42
-    ancho_t = int(Image.open(tarjetas[0][1]).width * escala)
-    alto_t = int(Image.open(tarjetas[0][1]).height * escala)
+    # Ancho fijo por tarjeta, no un factor: la pieza pasó a renderizarse a 2x y
+    # con un factor la lámina crecía con ella hasta hacerse incómoda de mirar.
+    ANCHO_TARJETA = 454
+    original = Image.open(tarjetas[0][1])
+    ancho_t = ANCHO_TARJETA
+    alto_t = round(original.height * ANCHO_TARJETA / original.width)
 
     PAD, GAP, TOP, PIE = 60, 56, 150, 250
     W = PAD * 2 + ancho_t * len(tarjetas) + GAP * (len(tarjetas) - 1)
