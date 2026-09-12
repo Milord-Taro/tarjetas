@@ -470,6 +470,19 @@ body::before {
   border-bottom-color: var(--color-olivo);
 }
 
+.contacto__multienlace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.contacto__sep {
+  color: var(--color-olivo);
+  font-size: clamp(0.78rem, 3.35vw, 0.95rem);
+  user-select: none;
+}
+
 /* ── Redes ───────────────────────────────────────────────────────────────── */
 /* Grilla de columnas iguales: así los tres círculos quedan a distancias
    homogéneas entre sí y respecto de los bordes, independiente de lo que mida

@@ -567,15 +567,43 @@ function construirRedesHtml({ persona, marca }) {
 // Solo entra acá lo que la persona haya decidido publicar: el resto (móvil o
 // correo personales) se entrega aparte y de forma consentida.
 function seccionesContacto({ persona, marca }) {
-  const dePersona = [
-    persona.whatsapp && {
+  let filaWhatsapp = null;
+  if (persona.whatsapp && marca.whatsapp) {
+    const valorEmpresa = marca.telefono_display || `+${marca.whatsapp}`;
+    const valorPersonal = persona.telefono_display || `+${persona.whatsapp}`;
+    filaWhatsapp = {
       icono: 'whatsapp',
       base: 'WhatsApp',
-      calificador: 'profesional',
+      valor: `${valorEmpresa} - ${valorPersonal}`,
+      htmlValor:
+        `<span class="contacto__multienlace">` +
+        `<a class="contacto__valor" href="https://wa.me/${marca.whatsapp}" target="_blank" rel="noopener">${escapeHtml(valorEmpresa)}</a>` +
+        `<span class="contacto__sep" aria-hidden="true"> - </span>` +
+        `<a class="contacto__valor" href="https://wa.me/${persona.whatsapp}" target="_blank" rel="noopener">${escapeHtml(valorPersonal)}</a>` +
+        `</span>`,
+      htmlValorV1:
+        `<a href="https://wa.me/${marca.whatsapp}" target="_blank" rel="noopener">${escapeHtml(valorEmpresa)}</a> - ` +
+        `<a href="https://wa.me/${persona.whatsapp}" target="_blank" rel="noopener">${escapeHtml(valorPersonal)}</a>`,
+    };
+  } else if (persona.whatsapp) {
+    filaWhatsapp = {
+      icono: 'whatsapp',
+      base: 'WhatsApp',
       valor: persona.telefono_display || `+${persona.whatsapp}`,
       href: `https://wa.me/${persona.whatsapp}`,
       externo: true,
-    },
+    };
+  } else if (marca.whatsapp) {
+    filaWhatsapp = {
+      icono: 'whatsapp',
+      base: 'WhatsApp',
+      valor: marca.telefono_display || `+${marca.whatsapp}`,
+      href: `https://wa.me/${marca.whatsapp}`,
+      externo: true,
+    };
+  }
+
+  const dePersona = [
     persona.email && {
       icono: 'correo',
       base: 'Correo',
@@ -586,14 +614,6 @@ function seccionesContacto({ persona, marca }) {
   ].filter(Boolean);
 
   const deMarca = [
-    marca.whatsapp && {
-      icono: 'whatsapp',
-      base: 'WhatsApp',
-      calificador: 'empresarial',
-      valor: marca.telefono_display || `+${marca.whatsapp}`,
-      href: `https://wa.me/${marca.whatsapp}`,
-      externo: true,
-    },
     marca.email && {
       icono: 'correo',
       base: 'Correo',
@@ -611,13 +631,7 @@ function seccionesContacto({ persona, marca }) {
     },
   ].filter(Boolean);
 
-  // Orden de uso real: primero el WhatsApp (el canal por el que de verdad
-  // escriben), después los dos correos juntos —así se leen uno contra otro y la
-  // distinción profesional/empresarial se entiende sola— y al final la oficina.
-  const orden = { whatsapp: 0, correo: 1, ubicacion: 2 };
-  const filas = [...deMarca, ...dePersona].sort(
-    (a, b) => orden[a.icono] - orden[b.icono] || (a.calificador === 'profesional' ? -1 : 1)
-  );
+  const filas = [filaWhatsapp, ...dePersona, ...deMarca].filter(Boolean);
 
   // El calificador solo aparece cuando hay dos filas del mismo tipo que
   // distinguir. Con un solo correo, "Correo" a secas se lee mejor.
@@ -655,7 +669,9 @@ function seccionesContactoHtmlV2(secciones, iconos = ICONOS_CONTACTO.v2) {
             `            <span class="contacto__badge" aria-hidden="true">${iconos[fila.icono] ?? ICONOS_CONTACTO.v2[fila.icono]}</span>\n` +
             `            <span class="contacto__texto">\n` +
             `              <span class="contacto__etiqueta">${escapeHtml(fila.etiqueta)}</span>\n` +
-            `              <a class="contacto__valor" href="${escapeHtml(fila.href)}"${atributosEnlace(fila)}>${valorHtml(fila)}</a>\n` +
+            (fila.htmlValor
+              ? `              ${fila.htmlValor}\n`
+              : `              <a class="contacto__valor" href="${escapeHtml(fila.href)}"${atributosEnlace(fila)}>${valorHtml(fila)}</a>\n`) +
             `            </span>\n` +
             `          </li>`
         )
@@ -678,7 +694,9 @@ function seccionesContactoHtmlV1(secciones) {
           (fila) =>
             `<li class="dato${fila.esDireccion ? ' dato--direccion' : ''}">\n` +
             `          ${ICONOS_CONTACTO.v1[fila.icono]}\n` +
-            `          <a${fila.esDireccion ? ' class="direccion"' : ''} href="${escapeHtml(fila.href)}"${atributosEnlace(fila)}>${valorHtml(fila)}</a>\n` +
+            (fila.htmlValorV1
+              ? `          ${fila.htmlValorV1}\n`
+              : `          <a${fila.esDireccion ? ' class="direccion"' : ''} href="${escapeHtml(fila.href)}"${atributosEnlace(fila)}>${valorHtml(fila)}</a>\n`) +
             `        </li>`
         )
         .join('\n        ');

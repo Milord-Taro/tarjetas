@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 import qrcode
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -701,6 +701,26 @@ def generar_qr(datos, color_fill, color_back, emblema=None, objetivo=None, versi
     return img
 
 
+def cargar_qr_personalizado(ruta_imagen, color_fill, color_back, objetivo):
+    """Carga un QR externo (como NUEVOQR.jpeg), recorta márgenes excesivos,
+    le agrega una zona de silencio idéntica (2 módulos), lo colorea con la
+    paleta del tema y lo escala con LANCZOS a la medida exacta del otro QR."""
+    raw = Image.open(ruta_imagen).convert("L")
+    inv = ImageOps.invert(raw)
+    bbox = inv.getbbox()
+    if bbox:
+        xmin, ymin, xmax, ymax = bbox
+        estricto = raw.crop((xmin, ymin, xmax, ymax))
+        mod_size = (xmax - xmin) / 41
+        pad = int(round(mod_size * 2))
+        con_margen = Image.new("L", (estricto.width + 2 * pad, estricto.height + 2 * pad), 255)
+        con_margen.paste(estricto, (pad, pad))
+    else:
+        con_margen = raw
+    coloreado = ImageOps.colorize(con_margen, black=color_fill, white=color_back)
+    return coloreado.resize((objetivo, objetivo), Image.LANCZOS)
+
+
 def igualar_qr(codigos, color_back):
     """Deja todos los QR del mismo lado, centrándolos sobre un lienzo del color de
     fondo del código.
@@ -763,16 +783,17 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     # dos correos se distinguen por la etiqueta y no por un título de sección, y
     # el calificador solo aparece si de verdad hay dos que separar.
     dos_correos = bool(persona.get("email")) and bool(marca.get("email"))
-    dos_whatsapp = bool(persona.get("telefono_display")) and bool(marca.get("telefono_display"))
+    if persona.get("telefono_display") and marca.get("telefono_display"):
+        whatsapp_valor = f"{marca.get('telefono_display')} - {persona.get('telefono_display')}"
+    else:
+        whatsapp_valor = persona.get("telefono_display") or marca.get("telefono_display")
+
     y = dibujar_seccion(
         lienzo, draw, y, paleta, "Empresa",
         [
             # dibujar_seccion descarta las filas sin valor: lo que la persona no
             # publica, simplemente no aparece.
-            ("whatsapp", "WhatsApp empresarial" if dos_whatsapp else "WhatsApp",
-             marca.get("telefono_display")),
-            ("whatsapp", "WhatsApp profesional" if dos_whatsapp else "WhatsApp",
-             persona.get("telefono_display")),
+            ("whatsapp", "WhatsApp", whatsapp_valor),
             ("correo", "Correo profesional" if dos_correos else "Correo", persona.get("email")),
             ("correo", "Correo empresarial" if dos_correos else "Correo", marca.get("email")),
             ("ubicacion", "Oficina", direccion_lineas),
@@ -838,29 +859,41 @@ def generar_tarjeta_whatsapp(persona, marca, paleta, logo_claro, emblema, plano,
     # Se piden al tamaño del archivo FINAL, no al del lienzo de dibujo: estos dos
     # no pasan por la reducción de supermuestreo.
     objetivo_qr = QR_TAMANO * ESCALA_SALIDA
-    qr_contacto = generar_qr(
-        datos_contacto, paleta["qr_modulo"], paleta["qr_fondo"], emblema, objetivo_qr, version
-    )
+
+    # QR DERECHO: Tarjeta digital de Daniel (no se toca para NADA)
     qr_tarjeta = generar_qr(url_publica, paleta["qr_modulo"], paleta["qr_fondo"], None, objetivo_qr, version)
 
-    # Red de seguridad por si alguna vez vuelven a diferir (otro contenido, otra
-    # marca): antes de enmarcarlos se igualan los lados.
-    qr_contacto, qr_tarjeta = igualar_qr([qr_contacto, qr_tarjeta], paleta["qr_fondo"])
+    # QR IZQUIERDO: Reemplaza el de guardar contacto por el de TOPP CREATE (NUEVOQR.jpeg)
+    ruta_qr_marca = ROOT / "assets" / "marcas" / marca.get("id", "") / "qr-toppcreate.jpeg"
+    if not ruta_qr_marca.exists():
+        ruta_qr_marca = ROOT / "NUEVOQR.jpeg"
+
+    if ruta_qr_marca.exists():
+        qr_izq = cargar_qr_personalizado(
+            ruta_qr_marca, paleta["qr_modulo"], paleta["qr_fondo"], qr_tarjeta.width
+        )
+        caption_izq = "TOPP CREATE"
+    else:
+        qr_izq = generar_qr(datos_contacto, paleta["qr_modulo"], paleta["qr_fondo"], emblema, objetivo_qr, version)
+        caption_izq = "GUARDAR CONTACTO"
+
+    # Red de seguridad para asegurar lados exactamente iguales
+    qr_izq, qr_tarjeta = igualar_qr([qr_izq, qr_tarjeta], paleta["qr_fondo"])
 
     # El QR mide lo que le tocó al escalar por módulos; el marco se calcula desde
     # ahí, de vuelta a unidades de diseño para colocarlo con el resto del arte.
-    lado_marco = qr_contacto.width / ESCALA_SALIDA + 2 * QR_MARCO_PAD
+    lado_marco = qr_izq.width / ESCALA_SALIDA + 2 * QR_MARCO_PAD
     # Tres huecos iguales: costado, centro, costado.
     hueco = (WIDTH - 2 * lado_marco) / 3
     x_izq = int(hueco)
     x_der = int(2 * hueco + lado_marco)
 
-    for x, qr in ((x_izq, qr_contacto), (x_der, qr_tarjeta)):
+    for x, qr in ((x_izq, qr_izq), (x_der, qr_tarjeta)):
         lienzo.pegar_al_final(qr, dibujar_qr_enmarcado(draw, x, qr_top, qr, paleta, lado_marco))
 
     fnt_caption = fuente("medium", 26)
     caption_y = qr_top + lado_marco + 22
-    for x, texto in ((x_izq, "GUARDAR CONTACTO"), (x_der, "TARJETA DIGITAL")):
+    for x, texto in ((x_izq, caption_izq), (x_der, "TARJETA DIGITAL")):
         ancho = ancho_espaciado(draw, texto, fnt_caption, 3)
         texto_espaciado(draw, (x + (lado_marco - ancho) / 2, caption_y), texto, fnt_caption, paleta["texto_secundario"], 3)
 
